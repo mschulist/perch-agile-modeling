@@ -134,7 +134,6 @@ def embed_audio(embed_fn,
             file_writer.flush()
     finally:
         del(audio_iterator)
-        print(f'\n\nSuccessfully processed {succ} source_infos, failed {fail} times.')
 
     fns = [fn for fn in output_dir.glob('embeddings-*')]
     ds = tf.data.TFRecordDataset(fns)

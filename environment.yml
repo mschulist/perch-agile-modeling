@@ -7,5 +7,5 @@ dependencies:
     - pandas
     - polars
     - matplotlib
-    - git+https://github.com/google-research/perch.git
     - tensorflow[and-cuda]
+    - git+https://github.com/google-research/perch.git

@@ -36,8 +36,9 @@ def get_target_recordings_species(
         path = target_path / epath.Path(f'{species_code}_{type}')
         if not os.path.exists(path):
             n_recordings[type] = n
+            path.mkdir(parents=True, exist_ok=True)
         n_files = len(os.listdir(path))
-        print(n_files)
+        print(f'existing recordings: {n_files}')
         n_recordings[type] = n_files + n
     
     scientific_name = ebird_taxon[ebird_taxon['SPECIES_CODE'] == species_code]['SCI_NAME'].values[0]
@@ -136,6 +137,9 @@ def search_recordings(
     sample_rate, 
     project_state,
     bootstrap_config):
+    
+    if not labeled_path.exists():
+        labeled_path.mkdir(parents=True, exist_ok=True)
 
     # get list of species and types
     dirs = [f.path for f in os.scandir(target_path) if f.is_dir()]
@@ -151,7 +155,7 @@ def search_recordings(
     finished_targets_path = labeled_path / epath.Path('finished_targets.csv')
     if not finished_targets_path.exists():
         with finished_targets_path.open('a') as f:
-            f.write('start\n')
+            f.write('finished\n')
     already_labeled = set(pd.read_csv(
         labeled_path / epath.Path('finished_targets.csv'), 
         header=None).iloc[:,0].to_list())
@@ -181,7 +185,10 @@ def get_missing_species(
     types: List[str],
     n_recordings: int):
 
-    bird_list_types = [f'{bird}_{type}' for bird in bird_list for type in types]
+    if bird_list is None:
+        bird_list_types = []
+    else:
+        bird_list_types = [f'{bird}_{type}' for bird in bird_list for type in types]
 
     dirs = [f.path for f in os.scandir(labeled_path) if f.is_dir()]
     species_type = [dir.split('/')[-1] for dir in dirs]
