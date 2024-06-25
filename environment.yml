@@ -1,0 +1,11 @@
+name: perch-agile-modeling
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - numpy
+    - pandas
+    - polars
+    - matplotlib
+    - git+https://github.com/google-research/perch.git
+    - tensorflow[and-cuda]
