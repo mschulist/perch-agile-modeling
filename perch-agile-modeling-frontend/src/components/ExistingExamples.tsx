@@ -1,20 +1,22 @@
-import { ExistingExamples } from "@/models/existingExamples"
+import { Example, ExistingExamples } from "@/models/existingExamples"
 
 export default function ExistingExamplesComponent({
     examples,
 }: {
-    examples: ExistingExamples
+    examples: Example[]
 }) {
     return (
-        <div>
-            <h2>Existing Examples</h2>
-            <ul>
-                {examples.examples.map((example) => (
-                    <li key={example.class + example.number}>
-                        {example.class} {example.number}
-                    </li>
-                ))}
-            </ul>
+        <div className="flex flex-col">
+            <h2 className="text-xl font-bold py-4">Existing Examples</h2>
+            <div className="flex flex-row h-96 overflow-y-scroll">
+                <ul className="list-disc pl-4">
+                    {examples.map((example) => (
+                        <li key={example.class + example.number} className="mb-2">
+                            {example.class}: {example.number}
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </div>
     )
 }

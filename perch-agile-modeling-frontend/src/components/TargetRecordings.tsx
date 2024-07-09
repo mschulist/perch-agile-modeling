@@ -1,42 +1,41 @@
 "use client"
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import ExistingExamplesComponent from "./ExistingExamples"
 import { Example, ExistingExamples } from "@/models/existingExamples"
-import { ConstructionIcon } from "lucide-react"
+import { get } from "http"
 
 const EXAMPLE_TYPE = "targetRecordings"
 
 export default function TargetRecordings() {
     const [project, setProject] = useState<string>("caples-testing")
-    const [examples, setExamples] = useState<Example[]>([])
+    const [targetRecordings, setTargetRecordings] = useState<Example[]>([])
 
-    const getExamples = async () => {
-        fetch("api/getExamples", {
-            method: "POST",
-            body: JSON.stringify({
-                project: project,
-                exampleType: EXAMPLE_TYPE,
-            }),
-        }).then(async (res) => {
-            const data = await res.json()
-            if (!data.success) {
-                console.error("Error occurred during fetch:", data.error)
-                return
-            }
-            console.log(data)
-            setExamples(data.examples)
-        })
-    }
+    useEffect(() => {
+        const getExamples = async () => {
+            fetch("api/getExamples", {
+                method: "POST",
+                body: JSON.stringify({
+                    project: project,
+                    exampleType: EXAMPLE_TYPE,
+                }),
+            }).then(async (res) => {
+                const data = await res.json()
+                if (!data.success) {
+                    console.error("Error occurred during fetch:", data.error)
+                    return
+                }
+                console.log(data)
+                setTargetRecordings(data.examples)
+            })
+        }
+        getExamples()
+    }, [project])
 
     return (
-        <div className="flex justify-center items-center h-screen">
-            <button
-                onClick={getExamples}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            >
-                Get Examples
-            </button>
-            {/* <ExistingExamplesComponent /> */}
+        <div className="flex flex-col justify-center items-center h-screen">
+            {targetRecordings.length > 0 && (
+                <ExistingExamplesComponent examples={targetRecordings} />
+            )}
         </div>
     )
 }

@@ -4,10 +4,20 @@ import { Label } from "@/components/ui/label"
 import { set } from "firebase/database"
 import { useState } from "react"
 import { CheckSourceInfoResponse } from "@/models/sourceInfos"
+import { SourceInfoEmbedButton } from "./SourceInfoEmbedButton"
+import { Button } from "@/components/ui/button"
 
 export default function SourceInfos() {
     const [sourceInfos, setSourceInfos] = useState<string>("gs://")
     const [files, setFiles] = useState<string[]>([])
+    const [validSourceInfos, setValidSourceInfos] = useState<boolean | null>(
+        null
+    )
+    const [sourceInfoError, setSourceInfoError] = useState<string | undefined>(
+        ""
+    )
+    const [project, setProject] = useState<string>("caples-testing")
+    // TODO: add ability to set project here based on auth
 
     const checkSourceInfos = async () => {
         fetch("api/checkSourceGlobs", {
@@ -15,18 +25,29 @@ export default function SourceInfos() {
             body: JSON.stringify({ glob: sourceInfos }),
         }).then(async (res) => {
             const data: CheckSourceInfoResponse = await res.json()
+            setFiles(data.files)
             if (!data.success) {
                 console.error("Error occurred during fetch:", data.error)
+                setSourceInfoError(data.error)
                 return
             }
-            setFiles(data.files)
+            if (data.files.length > 0) {
+                setValidSourceInfos(true)
+                setSourceInfoError(undefined)
+            } else {
+                setValidSourceInfos(false)
+            }
         })
+    }
+
+    const startEmbedding = () => {
+        console.log("Embedding source infos")
     }
 
     return (
         <div className="flex flex-col px-32 items-center">
             <Label htmlFor="sourceInfoInput" className="my-4">
-                Source Info globs:
+                Source Info glob:
             </Label>
             <Input
                 id="sourceInfoInput"
@@ -37,22 +58,36 @@ export default function SourceInfos() {
                     setSourceInfos(e.target.value)
                 }}
             />
-            <button
+            <Button
                 onClick={checkSourceInfos}
-                className="my-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                variant="outline"
+                className="my-4"
             >
                 Check Source Infos
-            </button>
+            </Button>
             {files.length > 0 && (
                 <div className="flex flex-col items-center">
                     <h1 className="text-2xl font-bold">First 100 files:</h1>
-                    <div className="w-full min-w-[500px] h-96 overflow-y-scroll bg-gray-800 mt-4 p-4">
+                    <div className="w-full min-w-[500px] h-96 overflow-y-scroll bg-gray-800 mt-4 p-4 rounded-xl">
                         {files.slice(0, 100).map((file, index) => (
                             <div key={index} className="py-1">
                                 {file}
                             </div>
                         ))}
                     </div>
+                </div>
+            )}
+            {!validSourceInfos && validSourceInfos !== null && (
+                <p className="text-red-500">
+                    No files found for the given glob
+                </p>
+            )}
+            {sourceInfoError && (
+                <p className="text-red-500">{sourceInfoError}</p>
+            )}
+            {validSourceInfos && (
+                <div className="p-4">
+                    <SourceInfoEmbedButton onClick={startEmbedding} />
                 </div>
             )}
         </div>

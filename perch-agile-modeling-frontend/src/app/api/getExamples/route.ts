@@ -18,10 +18,11 @@ import pathlib from "path"
     : firebaseAdmin.app()
 
 /**
- * Handles the GET request.
+ * Handles the POST request.
  * @param request - The request object.
+ * @returns A JSON response with the success status and examples.
  */
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
     const body = await request.json()
     const project = body.project
     const exampleType: ExampleType = body.exampleType
@@ -30,10 +31,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, examples })
 }
 
+/**
+ * Retrieves the examples based on the example type.
+ * @param examplesPath - The path to the examples.
+ * @param exampleType - The type of example.
+ * @returns A promise that resolves to an array of examples.
+ * @throws Error if the example type is invalid.
+ */
 async function getExamplesBasedOnType(
     examplesPath: string,
     exampleType: ExampleType
-) {
+): Promise<Example[]> {
     switch (exampleType) {
         case "targetRecordings":
             return getExistingExamplesFolders(examplesPath)
@@ -120,6 +128,13 @@ async function getExistingExamplesFolders(
     return examples
 }
 
+/**
+ * Retrieves the existing examples for a given project.
+ * Only use for examples that are in a single folder.
+ * @param examplesPath - The examples path.
+ * @returns The existing examples.
+ * @throws Error if the function is not implemented yet.
+ */
 async function getExistingExamplesSingleFolder(
     examplesPath: string
 ): Promise<Example[]> {
