@@ -34,3 +34,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+caples-firebase-adminsdk-hp0f6-fcca47250d.json

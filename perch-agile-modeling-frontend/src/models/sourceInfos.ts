@@ -1,5 +1,5 @@
 export interface CheckSourceInfoResponse {
-  files: string[];
-  success: boolean;
-  error?: string;
+    files: string[]
+    success: boolean
+    error?: string
 }
