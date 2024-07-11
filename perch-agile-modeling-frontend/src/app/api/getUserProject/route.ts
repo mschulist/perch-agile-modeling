@@ -3,14 +3,17 @@ import { NextResponse } from "next/server"
 import firebaseAdmin from "firebase-admin"
 import { cert, ServiceAccount } from "firebase-admin/app"
 import { getFirestore } from "firebase-admin/firestore"
-import serviceAccount from "../caples-firebase-adminsdk-hp0f6-fcca47250d.json"
+
+const FIREBASE_SERVICE_ACCOUNT = JSON.parse(
+    process.env.FIREBASE_SERVICE_ACCOUNT as string
+)
 
 /**
  * Initializes the Firebase app with the provided service account credentials.
  */
 !firebaseAdmin.apps.length
     ? firebaseAdmin.initializeApp({
-          credential: cert(serviceAccount as string | ServiceAccount),
+          credential: cert(FIREBASE_SERVICE_ACCOUNT as string | ServiceAccount),
       })
     : firebaseAdmin.app()
 

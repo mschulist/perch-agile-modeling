@@ -4,16 +4,19 @@ import firebaseAdmin from "firebase-admin"
 import { cert, ServiceAccount } from "firebase-admin/app"
 import { getFirestore } from "firebase-admin/firestore"
 import { ExampleType, Example } from "@/models/existingExamples"
-import serviceAccount from "../caples-firebase-adminsdk-hp0f6-fcca47250d.json"
 import { splitPathIntoBucketAndPath } from "@/utils/gcloud_utils"
 import pathlib from "path"
+
+const FIREBASE_SERVICE_ACCOUNT = JSON.parse(
+    process.env.FIREBASE_SERVICE_ACCOUNT as string
+)
 
 /**
  * Initializes the Firebase app with the provided service account credentials.
  */
 !firebaseAdmin.apps.length
     ? firebaseAdmin.initializeApp({
-          credential: cert(serviceAccount as string | ServiceAccount),
+          credential: cert(FIREBASE_SERVICE_ACCOUNT as string | ServiceAccount),
       })
     : firebaseAdmin.app()
 

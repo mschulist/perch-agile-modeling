@@ -4,8 +4,10 @@ import pathlib from "path"
 import { precomputedExample } from "@/models/precomputedExample"
 import { NextResponse } from "next/server"
 
+const GS_SERVICE_ACCOUNT = JSON.parse(process.env.GS_SERVICE_ACCOUNT as string)
+
 const storage = new Storage({
-    keyFilename: "./src/app/api/caples-storage-key.json",
+    credentials: GS_SERVICE_ACCOUNT,
 })
 
 export async function POST(request: Request) {
@@ -23,6 +25,7 @@ export async function POST(request: Request) {
             })
         )
     }
+    await addToAlreadyLabeledFile(alreadyLabeledFile, example)
     console.log(example)
     return NextResponse.json({ success: true, example })
 }
@@ -43,18 +46,21 @@ async function getNextExample(
 
     for (const example of examples) {
         if (!alreadyLabeled.has(example)) {
-            const [filename, timestampS, species] = example.split("^_^")
+            let [filename, timestampS, species] = example.split("^_^")
+            species = species.slice(0, -4)
             const audio_url = `https://storage.googleapis.com/${bucket}/${path}${example}`
             const spec_url = `https://storage.googleapis.com/${bucket}/${path}${example.slice(
                 0,
                 -4
             )}.png`
+            const gsuri = `gs://${bucket}/${path}${example}`
             const precomputedExample: precomputedExample = {
+                gsuri,
                 audio_url,
                 spec_url,
                 filename,
                 species,
-                timestampS: Number(timestampS),
+                timestampS: timestampS,
             }
             return precomputedExample
         }
@@ -72,6 +78,17 @@ async function getAlreadyLabeledExamples(
     ).toString()
     const alreadyLabeledLines = new Set(alreadyLabeled.split("\n"))
     return alreadyLabeledLines
+}
+
+async function addToAlreadyLabeledFile(
+    alreadyLabeledFile: string,
+    example: precomputedExample
+) {
+    const { bucket, path } = splitPathIntoBucketAndPath(alreadyLabeledFile)
+    let file = (await storage.bucket(bucket).file(path).download()).toString()
+    const currDatetime = new Date().toISOString()
+    file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
+    await storage.bucket(bucket).file(path).save(file)
 }
 
 async function findAlreadyLabeledFile() {
