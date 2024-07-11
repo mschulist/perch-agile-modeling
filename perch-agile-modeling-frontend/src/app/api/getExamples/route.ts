@@ -1,7 +1,7 @@
 import { Storage } from "@google-cloud/storage"
 import { NextResponse } from "next/server"
 import firebaseAdmin from "firebase-admin"
-import { initializeApp, cert, ServiceAccount } from "firebase-admin/app"
+import { cert, ServiceAccount } from "firebase-admin/app"
 import { getFirestore } from "firebase-admin/firestore"
 import { ExampleType, Example } from "@/models/existingExamples"
 import serviceAccount from "../caples-firebase-adminsdk-hp0f6-fcca47250d.json"
@@ -16,6 +16,8 @@ import pathlib from "path"
           credential: cert(serviceAccount as string | ServiceAccount),
       })
     : firebaseAdmin.app()
+
+const db = getFirestore()
 
 /**
  * Handles the POST request.
@@ -65,26 +67,23 @@ async function getExamplesPath(
     project: string,
     exampleType: ExampleType
 ): Promise<string> {
-    const db = getFirestore()
-    // TODO: make this actually work lol
-    // console.log(await db.collection("projects").listDocuments())
-    // const projectInfo = (
-    //     await db.collection("projects").doc(project).get()
-    // ).data()
+    const projectInfo = (
+        await db.collection("projects").doc(project).get()
+    ).data()
 
-    // // console.log(projectInfo)
+    console.log(projectInfo)
 
-    // if (!projectInfo) {
-    //     throw new Error("Project info not found")
-    // }
+    if (!projectInfo) {
+        throw new Error("Project info not found")
+    }
 
-    // const examplesPath = projectInfo.data()[exampleType]
+    const examplesPath = projectInfo[exampleType]
 
-    // if (!examplesPath) {
-    //     throw new Error("No examples path found for project")
-    // }
+    if (!examplesPath) {
+        throw new Error("No examples path found for project")
+    }
 
-    return "gs://bird-ml/caples-data/target_recordings"
+    return examplesPath
 }
 
 /**
@@ -100,7 +99,7 @@ async function getExistingExamplesFolders(
 
     const examples: Example[] = []
 
-    let examplesDict: { [key: string]: any } = {}
+    let examplesDict: { [key: string]: number } = {}
 
     const { bucket, path } = splitPathIntoBucketAndPath(examplesPath)
     const files = (
@@ -138,5 +137,37 @@ async function getExistingExamplesFolders(
 async function getExistingExamplesSingleFolder(
     examplesPath: string
 ): Promise<Example[]> {
-    throw new Error("Not implemented yet")
+    const storage = new Storage()
+
+    let examplesDict: { [key: string]: number } = {}
+
+    const { bucket, path } = splitPathIntoBucketAndPath(examplesPath)
+
+    const files = (
+        await storage.bucket(bucket).getFiles({ matchGlob: `${path}/*.wav` })
+    )[0]
+
+    const fileNames = files.map((file) => file.name)
+
+    for (const fileName of fileNames) {
+        let [file, timestampS, species] = pathlib
+            .basename(fileName)
+            .split("^_^")
+        species = species.split(".")[0] // get rid of the file extension
+        if (species in examplesDict) {
+            examplesDict[species]++
+        } else {
+            examplesDict[species] = 1
+        }
+    }
+
+    const examples: Example[] = []
+
+    for (const species in examplesDict) {
+        examples.push({
+            class: species,
+            number: examplesDict[species],
+        })
+    }
+    return examples
 }

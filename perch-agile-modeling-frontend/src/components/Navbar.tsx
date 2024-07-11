@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from "react"
+import React, { use, useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { User, getAuth } from "firebase/auth"
 import {
@@ -15,31 +15,27 @@ import {
 import SignOut from "./SignOut"
 import { getFirebaseConfig } from "@/utils/firebase_config"
 import UserIcon from "./UserIcon"
+import { useAuth } from "./Auth"
 
 const { app, provider, db } = getFirebaseConfig()
 
 // TODO: add more paths when more pages are added
 
 const Navbar: React.FC = () => {
-    const [user, setUser] = useState<null | User>(null)
+    const user = useAuth()
     const router = useRouter()
-    const auth = getAuth()
 
     const paths = [
         { href: "/", label: "Home" },
         user && { href: "/sourceInfos", label: "Source Infos" },
         user && { href: "/targetRecordings", label: "Target Recordings" },
+        user && { href: "/searchResults", label: "Search Results" },
+        user && { href: "/labeledOutputs", label: "Labeled Outputs" },
+        user && { href: "/annotateRecordings", label: "Annotate Recordings" },
     ]
 
-    useEffect(() => {
-        const auth = getAuth()
-        auth.onAuthStateChanged((user) => {
-            setUser(user)
-        })
-    }, [user])
-
     return (
-        <div className="flex justify-center items-center p-4">
+        <div className="flex justify-start items-center p-4">
             <NavigationMenu>
                 <NavigationMenuList>
                     {paths.map(

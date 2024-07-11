@@ -1,6 +1,6 @@
 import ExistingExamplesComponent from "@/components/ExistingExamples"
-import TargetRecordings from "@/components/TargetRecordings"
+import TargetRecordingsPage from "@/components/TargetRecordingsPage"
 
 export default function Page() {
-    return <TargetRecordings />
+    return <TargetRecordingsPage />
 }

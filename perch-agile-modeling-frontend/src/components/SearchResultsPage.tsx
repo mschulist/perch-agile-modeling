@@ -1,16 +1,20 @@
 "use client"
-import { useCallback, useEffect, useState } from "react"
+import { ExampleType, Example } from "@/models/existingExamples"
+import { useState, useEffect } from "react"
 import ExistingExamplesComponent from "./ExistingExamples"
-import { Example, ExistingExamples } from "@/models/existingExamples"
-import { get } from "http"
+import { useProject } from "./Auth"
 
-const EXAMPLE_TYPE = "targetRecordings"
+const EXAMPLE_TYPE: ExampleType = "searchResults"
 
-export default function TargetRecordings() {
-    const [project, setProject] = useState<string>("caples-testing")
+export default function LabeledOutputsPage() {
     const [targetRecordings, setTargetRecordings] = useState<Example[]>([])
 
+    const project = useProject()
+
     useEffect(() => {
+        if (!project) {
+            return
+        }
         const getExamples = async () => {
             fetch("api/getExamples", {
                 method: "POST",
@@ -34,7 +38,12 @@ export default function TargetRecordings() {
     return (
         <div className="flex flex-col justify-center items-center h-screen">
             {targetRecordings.length > 0 && (
-                <ExistingExamplesComponent examples={targetRecordings} />
+                <div className="flex flex-col">
+                    <h2 className="text-2xl font-bold py-2">
+                        Existing Search Results
+                    </h2>
+                    <ExistingExamplesComponent examples={targetRecordings} />
+                </div>
             )}
         </div>
     )

@@ -2,7 +2,11 @@
 import { FirebaseApp, initializeApp } from "firebase/app"
 import { Analytics, getAnalytics } from "firebase/analytics"
 import { GoogleAuthProvider } from "firebase/auth"
-import { Firestore, getFirestore } from "firebase/firestore"
+import {
+    Firestore,
+    getFirestore,
+    initializeFirestore,
+} from "firebase/firestore"
 
 const firebaseConfig = {
     apiKey: "AIzaSyAOGWw5LWAXLGH8XimeRxiTpTTfAQoBK5M",
@@ -23,6 +27,6 @@ export function getFirebaseConfig(): {
     return {
         app,
         provider: new GoogleAuthProvider(),
-        db: getFirestore(app),
+        db: initializeFirestore(app, { experimentalForceLongPolling: true }),
     }
 }

@@ -35,4 +35,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+caples-storage-key.json
 caples-firebase-adminsdk-hp0f6-fcca47250d.json
