@@ -32,7 +32,7 @@ export default function AnnotationButtons({
     }
 
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col self-center">
             {voc_types.map((voc_type) => (
                 <Button
                     variant="outline"
