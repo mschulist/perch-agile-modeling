@@ -50,7 +50,10 @@ export default function TargetRecordings() {
                     <h2 className="text-2xl font-bold py-2">
                         Existing Target Recordings
                     </h2>
-                    <ExistingExamplesComponent examples={targetRecordings} />
+                    <ExistingExamplesComponent
+                        examples={targetRecordings}
+                        exampleType={EXAMPLE_TYPE}
+                    />
                 </div>
             )}
         </div>

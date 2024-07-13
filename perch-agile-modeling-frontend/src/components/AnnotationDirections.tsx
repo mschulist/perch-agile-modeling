@@ -2,18 +2,17 @@ export default function AnnotationDirections() {
     return (
         <div className="text-gray-00">
             <p className="mb-4">
-                <span className="text-red-500">Directions:</span> Click &ldquo;Get
-                Next Recording&quot; to retrieve the next recording.
+                <span className="text-red-500">Directions:</span> 
             </p>
             <p className="mb-4">
                 <span className="text-blue-500">
-                    Listen to the recording and identify the species shown below
-                    the audio.
+                    Listen to the recording and use the buttons below to label
+                    the species. 
                 </span>
             </p>
             <p className="mb-4">
                 <span className="text-green-500">
-                    Click on the appropriate vocalization type for that species.
+                    
                 </span>
             </p>
             <p className="mb-4">

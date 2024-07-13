@@ -106,7 +106,7 @@ async function getExistingExamplesFolders(
 
     const { bucket, path } = splitPathIntoBucketAndPath(examplesPath)
     const files = (
-        await storage.bucket(bucket).getFiles({ matchGlob: `${path}/*/*` })
+        await storage.bucket(bucket).getFiles({ matchGlob: `${path}/*/*.wav` })
     )[0]
 
     const fileNames = files.map((file) => file.name)

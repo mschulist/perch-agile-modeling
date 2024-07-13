@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const { bucket, path } = splitPathIntoBucketAndPath(example.gsuri)
     const filename = example.filename.slice(0, -4) // remove .wav extension
     const timestampS = example.timestampS
-    const newFilename = `${filename}__${timestampS}.wav`
+    const newFilename = `${filename}___${timestampS}.wav`
     let newSpecies = `${example.species}_${voc_type}`
     if (voc_type === "unknown") {
         newSpecies = "unknown"

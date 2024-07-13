@@ -87,7 +87,7 @@ async function addToAlreadyLabeledFile(
     const { bucket, path } = splitPathIntoBucketAndPath(alreadyLabeledFile)
     let file = (await storage.bucket(bucket).file(path).download()).toString()
     const currDatetime = new Date().toISOString()
-    file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
+    // file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
     await storage.bucket(bucket).file(path).save(file)
 }
 

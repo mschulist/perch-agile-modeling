@@ -42,7 +42,10 @@ export default function LabeledOutputsPage() {
                     <h2 className="text-2xl font-bold py-2">
                         Existing Search Results
                     </h2>
-                    <ExistingExamplesComponent examples={targetRecordings} />
+                    <ExistingExamplesComponent
+                        examples={targetRecordings}
+                        exampleType={EXAMPLE_TYPE}
+                    />
                 </div>
             )}
         </div>
