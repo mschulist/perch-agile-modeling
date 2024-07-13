@@ -17,7 +17,6 @@ async function listSourceGlobs(glob_pattern: string): Promise<NextResponse> {
             .bucket(bucket)
             .getFiles({ matchGlob: path })
         const files = response[0].map((file) => file.name)
-        console.log(files)
         const r: CheckSourceInfoResponse = {
             success: true,
             files: files,

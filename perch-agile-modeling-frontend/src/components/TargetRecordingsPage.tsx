@@ -1,14 +1,7 @@
 "use client"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import ExistingExamplesComponent from "./ExistingExamples"
-import {
-    Example,
-    ExampleType,
-    ExistingExamples,
-} from "@/models/existingExamples"
-import { get } from "http"
-import { getFirebaseConfig } from "@/utils/firebase_config"
-import { collection, doc, getDocs } from "firebase/firestore"
+import { Example, ExampleType } from "@/models/existingExamples"
 import { useProject } from "./Auth"
 
 const EXAMPLE_TYPE: ExampleType = "targetRecordings"
@@ -18,6 +11,24 @@ export default function TargetRecordings() {
     const [targetRecordings, setTargetRecordings] = useState<Example[]>([])
 
     const project = useProject()
+
+    const getExamples = async () => {
+        fetch("api/getExamples", {
+            method: "POST",
+            body: JSON.stringify({
+                project: project,
+                exampleType: EXAMPLE_TYPE,
+            }),
+        }).then(async (res) => {
+            const data = await res.json()
+            if (!data.success) {
+                console.error("Error occurred during fetch:", data.error)
+                return
+            }
+            console.log(data)
+            setTargetRecordings(data.examples)
+        })
+    }
 
     useEffect(() => {
         if (!project) {
@@ -50,7 +61,11 @@ export default function TargetRecordings() {
                     <h2 className="text-2xl font-bold py-2">
                         Existing Target Recordings
                     </h2>
-                    <ExistingExamplesComponent examples={targetRecordings} />
+                    <ExistingExamplesComponent
+                        examples={targetRecordings}
+                        exampleType={EXAMPLE_TYPE}
+                        getExamples={getExamples}
+                    />
                 </div>
             )}
         </div>

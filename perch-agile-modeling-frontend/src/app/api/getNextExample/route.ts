@@ -1,32 +1,34 @@
-import { Storage } from "@google-cloud/storage"
-import { splitPathIntoBucketAndPath } from "@/utils/gcloud_utils"
+import {
+    getGoogleStorage,
+    splitPathIntoBucketAndPath,
+} from "@/utils/gcloud_utils"
 import pathlib from "path"
 import { precomputedExample } from "@/models/precomputedExample"
 import { NextResponse } from "next/server"
+import {
+    getAdminFirestoreDB,
+    findAlreadyLabeledFile,
+    getExamplesPath,
+} from "@/utils/firebaseServerUtils"
 
-const GS_SERVICE_ACCOUNT = JSON.parse(process.env.GS_SERVICE_ACCOUNT as string)
+const db = getAdminFirestoreDB()
 
-const storage = new Storage({
-    credentials: GS_SERVICE_ACCOUNT,
-})
+const storage = getGoogleStorage()
 
 export async function POST(request: Request) {
-    const alreadyLabeledFile = await findAlreadyLabeledFile()
+    const response = await request.json()
+    const project: string = response.project
+    const alreadyLabeledFile = await findAlreadyLabeledFile(project, db)
     const alreadyLabeled = await getAlreadyLabeledExamples(alreadyLabeledFile)
-    const example = await getNextExample(
-        "gs://bird-ml/caples-data/precomputed_raven/",
-        alreadyLabeled
-    )
+    const examplesPath = await getExamplesPath(project, "searchResults", db)
+    const example = await getNextExample(examplesPath, alreadyLabeled)
     if (example === null) {
-        return new Response(
-            JSON.stringify({
-                success: false,
-                error: "No more examples to label, you're done!",
-            })
-        )
+        return NextResponse.json({
+            success: false,
+            error: "No more examples to label, you're done!",
+        })
     }
     await addToAlreadyLabeledFile(alreadyLabeledFile, example)
-    console.log(example)
     return NextResponse.json({ success: true, example })
 }
 
@@ -38,22 +40,49 @@ async function getNextExample(
 
     const precomputedExamples = await storage
         .bucket(bucket)
-        .getFiles({ matchGlob: `${path}*.wav` })
+        .getFiles({ matchGlob: `${path}/*` })
 
-    const examples = precomputedExamples[0].map((file) => {
-        return pathlib.basename(file.name)
+    let examples: { [key: string]: { spec?: any; audio?: any } } = {}
+    precomputedExamples[0].forEach((example) => {
+        const basename = pathlib.basename(example.name).slice(0, -4)
+        if (example.name.endsWith(".png")) {
+            if (basename in examples) {
+                examples[basename].spec = example
+            } else {
+                examples[basename] = {
+                    spec: example,
+                }
+            }
+        } else if (example.name.endsWith(".wav")) {
+            if (basename in examples) {
+                examples[basename].audio = example
+            } else {
+                examples[basename] = {
+                    audio: example,
+                }
+            }
+        }
     })
 
-    for (const example of examples) {
-        if (!alreadyLabeled.has(example)) {
-            let [filename, timestampS, species] = example.split("^_^")
-            species = species.slice(0, -4)
-            const audio_url = `https://storage.googleapis.com/${bucket}/${path}${example}`
-            const spec_url = `https://storage.googleapis.com/${bucket}/${path}${example.slice(
-                0,
-                -4
-            )}.png`
-            const gsuri = `gs://${bucket}/${path}${example}`
+    for (const example of Object.values(examples)) {
+        const basename = pathlib.basename(example.spec.name).slice(0, -4)
+        // check to see if the example has an audio file AND a spectrogram file
+        if (!alreadyLabeled.has(`${basename}.wav`) && example.audio && example.spec) {
+            let [filename, timestampS, species] = basename.split("^_^")
+            const audio_url = (
+                await example.audio.getSignedUrl({
+                    action: "read",
+                    expires: Date.now() + 15 * 60 * 1000,
+                })
+            )[0]
+            const spec_url = (
+                await example.spec.getSignedUrl({
+                    action: "read",
+                    expires: Date.now() + 15 * 60 * 1000,
+                })
+            )[0]
+
+            const gsuri = `gs://${bucket}/${path}/${basename}.wav`
             const precomputedExample: precomputedExample = {
                 gsuri,
                 audio_url,
@@ -72,7 +101,6 @@ async function getAlreadyLabeledExamples(
     alreadyLabeledFile: string
 ): Promise<Set<string>> {
     const { bucket, path } = splitPathIntoBucketAndPath(alreadyLabeledFile)
-    console.log(bucket, path)
     const alreadyLabeled = (
         await storage.bucket(bucket).file(path).download()
     ).toString()
@@ -89,9 +117,4 @@ async function addToAlreadyLabeledFile(
     const currDatetime = new Date().toISOString()
     file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
     await storage.bucket(bucket).file(path).save(file)
-}
-
-async function findAlreadyLabeledFile() {
-    // TODO: we want to store this file location in firebase and retrieve it here
-    return "gs://bird-ml/caples-data/labeled_outputs/finished_raven.csv"
 }
