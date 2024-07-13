@@ -65,7 +65,7 @@ export default function MoveLabeledExampleDialog({
                         <div className="flex flex-row items-center mt-4">
                             Move to:
                             <AutoSuggestLabel
-                                suggestions={["amedip", "amerob"]}
+                                suggestions={["amedip_song", "amerob_song"]}
                                 setCustomSpecies={setCustomSpecies}
                                 customSpecies={customSpecies}
                             />
