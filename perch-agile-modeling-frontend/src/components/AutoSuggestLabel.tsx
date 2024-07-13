@@ -1,18 +1,15 @@
 import { useState } from "react"
 import AutoSuggest from "react-autosuggest"
 
-export default function AutoSuggestLabel(
-    this: any,
-    {
-        label,
-        setLabel,
-        suggestions,
-    }: {
-        label: string
-        setLabel: (label: string) => void
-        suggestions: string[]
-    }
-) {
+export default function AutoSuggestLabel({
+    label,
+    setLabel,
+    suggestions,
+}: {
+    label: string
+    setLabel: (label: string) => void
+    suggestions: string[]
+}) {
     const [value, setValue] = useState(label)
     const [suggestionsList, setSuggestionsList] = useState<string[]>([])
 
@@ -45,7 +42,7 @@ export default function AutoSuggestLabel(
     }
 
     function onChange(
-        event: React.FormEvent<HTMLInputElement>,
+        event: React.FormEvent<HTMLElement>,
         { newValue }: { newValue: string }
     ) {
         setValue(newValue)
@@ -54,7 +51,7 @@ export default function AutoSuggestLabel(
     const inputProps = {
         placeholder: "Label",
         value,
-        onChange: this.onChange,
+        onChange: onChange,
     }
 
     return (

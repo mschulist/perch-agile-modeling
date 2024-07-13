@@ -14,6 +14,7 @@ import Image from "next/image"
 import { Input } from "./ui/input"
 import { useState } from "react"
 import { useProject } from "./Auth"
+import AutoSuggestLabel from "./AutoSuggestLabel"
 
 export default function MoveLabeledExampleDialog({
     example,
@@ -63,14 +64,10 @@ export default function MoveLabeledExampleDialog({
                         <br />
                         <div className="flex flex-row items-center">
                             Move to:
-                            <Input
-                                className="self-center m-2 text-center w-1/2 text-green-600"
-                                type="text"
-                                placeholder="species_type"
-                                value={customSpecies}
-                                onChange={(e) =>
-                                    setCustomSpecies(e.target.value)
-                                }
+                            <AutoSuggestLabel
+                                label="species_code"
+                                setLabel={setCustomSpecies}
+                                suggestions={["amedip", "amerob"]}
                             />
                         </div>
                     </DialogTitle>
