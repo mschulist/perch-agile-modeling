@@ -90,8 +90,8 @@ async function getPrecomputedSpecUrl(
     timestampS: string
 ): Promise<string | null> {
     const { bucket, path } = splitPathIntoBucketAndPath(precomputed_dir)
-    const fileglob = pathlib.join(path, `*${filename}*${timestampS}*.png`)
-    console.log(fileglob)
+    const fileglob = pathlib.join(path, `*${filename}*^_^${timestampS}.0^_^*.png`)
+    console.log("fileglob", fileglob)
     const files = (
         await storage.bucket(bucket).getFiles({ matchGlob: fileglob })
     )[0]
@@ -105,6 +105,5 @@ async function getPrecomputedSpecUrl(
             action: "read",
         })
     )[0]
-    console.log(spec_url)
     return spec_url
 }

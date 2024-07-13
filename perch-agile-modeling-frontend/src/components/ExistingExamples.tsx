@@ -8,14 +8,18 @@ export default function ExistingExamplesComponent({
     examples,
     exampleType,
     canView = false,
+    getExamples,
 }: {
     examples: Example[]
     exampleType: string
     canView?: boolean
+    getExamples: () => void
 }) {
     const [labeledExamples, setLabeledExamples] = useState<
         existingLabeledOutput[]
     >([])
+
+    const examplesClasses = examples.map((example) => example.class)
 
     const project = useProject()
 
@@ -71,6 +75,9 @@ export default function ExistingExamplesComponent({
                 {labeledExamples.length > 0 && (
                     <ExistingLabeledExamples
                         labeledExamples={labeledExamples}
+                        exampleClasses={examplesClasses}
+                        getExamples={getExamples}
+                        getLabeledExamples={getLabeledExamples}
                     />
                 )}
             </div>

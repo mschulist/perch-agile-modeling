@@ -22,6 +22,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     const labeledOutputLocation = await getLabeledOutputLocation(project, db)
     const newGsuri = `${labeledOutputLocation}/${newExampleClass}/${basename}`
     console.log(`Moving ${example.gsuri} to ${newGsuri}`)
-    // moveFile(example.gsuri, newGsuri, storage, true)
+    moveFile(example.gsuri, newGsuri, storage, true)
     return NextResponse.json({ success: true })
 }

@@ -14,8 +14,6 @@ const InputWithSuggestions = ({
     const suggestionsContainerRef = useRef<HTMLUListElement | null>(null)
     const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false)
 
-    console.log(customSpecies)
-
     const handleChange = (e: { target: { value: string } }) => {
         const value = e.target.value
         setCustomSpecies(value)
@@ -24,7 +22,7 @@ const InputWithSuggestions = ({
             const filtered = suggestions.filter((suggestion) =>
                 suggestion.toLowerCase().startsWith(value.toLowerCase())
             )
-            setFilteredSuggestions(filtered)
+            setFilteredSuggestions(filtered.slice(0, 3))
             setIsSuggestionsVisible(true)
         } else {
             setFilteredSuggestions([])
@@ -41,28 +39,26 @@ const InputWithSuggestions = ({
     const handleBlur = (e: { relatedTarget: Node | null }) => {
         // Check if the blur event is happening because of a click inside the suggestions container
         if (
-            (suggestionsContainerRef.current) &&
-            !(
-                suggestionsContainerRef.current
-            ).contains(e.relatedTarget)
+            suggestionsContainerRef.current &&
+            !suggestionsContainerRef.current.contains(e.relatedTarget)
         ) {
             setIsSuggestionsVisible(false)
         }
     }
 
     return (
-        <div className="relative" onBlur={handleBlur}>
+        <div className="relative z-10" onBlur={handleBlur}>
             <Input
                 type="text"
                 value={customSpecies}
                 onChange={handleChange}
-                className="w-full ml-2 p-1 transition duration-100 text-center"
+                className="w-full p-1 transition duration-100 text-center"
                 placeholder="species_type"
             />
             {isSuggestionsVisible && filteredSuggestions.length > 0 && (
                 <ul
                     ref={suggestionsContainerRef}
-                    className="absolute left-4 right-0 mt-1 bg-black rounded shadow-lg transition duration-300 list-none"
+                    className="absolute left-0 right-0 mt-1 bg-black rounded shadow-lg transition duration-300 list-none"
                     onMouseDown={(e) => e.preventDefault()} // Prevents the input from losing focus when clicking on suggestions
                 >
                     {filteredSuggestions.map((suggestion, index) => (

@@ -3,13 +3,16 @@ import { Button } from "./ui/button"
 import { useAuth, useProject } from "./Auth"
 import { useState } from "react"
 import { Input } from "./ui/input"
+import AutoSuggestLabel from "./AutoSuggestLabel"
 
 export default function AnnotationButtons({
     example,
     getNextExample,
+    exampleClasses,
 }: {
     example: precomputedExample
     getNextExample: () => void
+    exampleClasses: string[]
 }) {
     const voc_types = ["call", "song"]
     const [customSpecies, setCustomSpecies] = useState<string>("")
@@ -55,13 +58,13 @@ export default function AnnotationButtons({
             <p className="self-center p-2">
                 If {example.species} is not present, but another species is:
             </p>
-            <Input
-                className="self-center m-2 text-center w-1/2"
-                type="text"
-                placeholder="species_type"
-                value={customSpecies}
-                onChange={(e) => setCustomSpecies(e.target.value)}
-            />
+            <div className="self-center">
+                <AutoSuggestLabel
+                    suggestions={exampleClasses}
+                    setCustomSpecies={setCustomSpecies}
+                    customSpecies={customSpecies}
+                />
+            </div>
             <Button
                 variant="outline"
                 className="m-2 self-center"

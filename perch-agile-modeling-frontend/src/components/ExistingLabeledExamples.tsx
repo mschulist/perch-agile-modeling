@@ -4,8 +4,14 @@ import MoveLabeledExampleDialog from "./MoveLabeledExampleDialog"
 
 export default function ExistingLabeledExamples({
     labeledExamples,
+    exampleClasses,
+    getLabeledExamples,
+    getExamples,
 }: {
     labeledExamples: existingLabeledOutput[]
+    exampleClasses: string[]
+    getLabeledExamples: (exampleClass: string) => void
+    getExamples: () => void
 }) {
     return (
         <div className="flex flex-col m-10 w-full">
@@ -19,13 +25,18 @@ export default function ExistingLabeledExamples({
                             <Image
                                 src={example.spec_url}
                                 alt=""
-                                height={600}
-                                width={600}
+                                height={250}
+                                width={250}
                                 className="rounded-xl"
                             />
                         )}
                         <br />
-                        <MoveLabeledExampleDialog example={example} />
+                        <MoveLabeledExampleDialog
+                            example={example}
+                            exampleClasses={exampleClasses}
+                            getLabeledExamples={getLabeledExamples}
+                            getExamples={getExamples}
+                        />
                         <audio
                             src={example.audio_url}
                             controls

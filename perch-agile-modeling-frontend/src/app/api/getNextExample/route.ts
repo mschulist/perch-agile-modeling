@@ -21,7 +21,6 @@ export async function POST(request: Request) {
     const alreadyLabeledFile = await findAlreadyLabeledFile(project, db)
     const alreadyLabeled = await getAlreadyLabeledExamples(alreadyLabeledFile)
     const examplesPath = await getExamplesPath(project, "searchResults", db)
-    console.log("examplesPath", examplesPath)
     const example = await getNextExample(examplesPath, alreadyLabeled)
     if (example === null) {
         return NextResponse.json({
@@ -30,7 +29,6 @@ export async function POST(request: Request) {
         })
     }
     await addToAlreadyLabeledFile(alreadyLabeledFile, example)
-    console.log(example)
     return NextResponse.json({ success: true, example })
 }
 
@@ -68,9 +66,9 @@ async function getNextExample(
 
     for (const example of Object.values(examples)) {
         const basename = pathlib.basename(example.spec.name).slice(0, -4)
-        if (!alreadyLabeled.has(basename)) {
+        // check to see if the example has an audio file AND a spectrogram file
+        if (!alreadyLabeled.has(`${basename}.wav`) && example.audio && example.spec) {
             let [filename, timestampS, species] = basename.split("^_^")
-
             const audio_url = (
                 await example.audio.getSignedUrl({
                     action: "read",
@@ -103,7 +101,6 @@ async function getAlreadyLabeledExamples(
     alreadyLabeledFile: string
 ): Promise<Set<string>> {
     const { bucket, path } = splitPathIntoBucketAndPath(alreadyLabeledFile)
-    console.log(bucket, path)
     const alreadyLabeled = (
         await storage.bucket(bucket).file(path).download()
     ).toString()
@@ -118,6 +115,6 @@ async function addToAlreadyLabeledFile(
     const { bucket, path } = splitPathIntoBucketAndPath(alreadyLabeledFile)
     let file = (await storage.bucket(bucket).file(path).download()).toString()
     const currDatetime = new Date().toISOString()
-    // file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
+    file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
     await storage.bucket(bucket).file(path).save(file)
 }

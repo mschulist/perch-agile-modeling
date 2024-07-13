@@ -18,8 +18,14 @@ import AutoSuggestLabel from "./AutoSuggestLabel"
 
 export default function MoveLabeledExampleDialog({
     example,
+    exampleClasses,
+    getExamples,
+    getLabeledExamples,
 }: {
     example: existingLabeledOutput
+    exampleClasses: string[]
+    getExamples: () => void
+    getLabeledExamples: (exampleClass: string) => void
 }) {
     const [customSpecies, setCustomSpecies] = useState<string>("")
 
@@ -41,6 +47,8 @@ export default function MoveLabeledExampleDialog({
             }
             console.log("Successfully moved example")
             setCustomSpecies("")
+            getExamples()
+            getLabeledExamples(example.exampleClass)
         })
     }
 
@@ -64,11 +72,13 @@ export default function MoveLabeledExampleDialog({
                         <br />
                         <div className="flex flex-row items-center mt-4">
                             Move to:
-                            <AutoSuggestLabel
-                                suggestions={["amedip_song", "amerob_song"]}
-                                setCustomSpecies={setCustomSpecies}
-                                customSpecies={customSpecies}
-                            />
+                            <div className="ml-2">
+                                <AutoSuggestLabel
+                                    suggestions={exampleClasses}
+                                    setCustomSpecies={setCustomSpecies}
+                                    customSpecies={customSpecies}
+                                />
+                            </div>
                         </div>
                     </DialogTitle>
                     <DialogDescription>
