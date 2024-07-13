@@ -1,6 +1,7 @@
 "use client"
 import {
     getAuth,
+    GoogleAuthProvider,
     signInWithPopup,
     User,
 } from "firebase/auth"
@@ -8,7 +9,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { getFirebaseConfig } from "@/utils/firebase_config"
 
-const { app, provider, db } = getFirebaseConfig()
+const app = getFirebaseConfig()
+const provider = new GoogleAuthProvider()
 
 /**
  * Renders the authentication component.

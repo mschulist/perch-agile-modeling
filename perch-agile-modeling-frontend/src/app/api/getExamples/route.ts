@@ -1,26 +1,14 @@
 import { Storage } from "@google-cloud/storage"
 import { NextResponse } from "next/server"
-import firebaseAdmin from "firebase-admin"
-import { cert, ServiceAccount } from "firebase-admin/app"
-import { getFirestore } from "firebase-admin/firestore"
 import { ExampleType, Example } from "@/models/existingExamples"
 import { splitPathIntoBucketAndPath } from "@/utils/gcloud_utils"
 import pathlib from "path"
+import {
+    getExamplesPath,
+    getAdminFirestoreDB,
+} from "@/utils/firebaseServerUtils"
 
-const FIREBASE_SERVICE_ACCOUNT = JSON.parse(
-    process.env.FIREBASE_SERVICE_ACCOUNT as string
-)
-
-/**
- * Initializes the Firebase app with the provided service account credentials.
- */
-!firebaseAdmin.apps.length
-    ? firebaseAdmin.initializeApp({
-          credential: cert(FIREBASE_SERVICE_ACCOUNT as string | ServiceAccount),
-      })
-    : firebaseAdmin.app()
-
-const db = getFirestore()
+const db = getAdminFirestoreDB()
 
 /**
  * Handles the POST request.
@@ -31,7 +19,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = await request.json()
     const project = body.project
     const exampleType: ExampleType = body.exampleType
-    const examplesPath = await getExamplesPath(project, exampleType)
+    const examplesPath = await getExamplesPath(project, exampleType, db)
     const examples = await getExamplesBasedOnType(examplesPath, exampleType)
     return NextResponse.json({ success: true, examples })
 }
@@ -57,36 +45,6 @@ async function getExamplesBasedOnType(
         default:
             throw new Error("Invalid example type")
     }
-}
-
-/**
- * Retrieves the examples path for a given project and example type.
- * @param project - The project name.
- * @param exampleType - The type of example.
- * @returns The examples path.
- * @throws Error if project info or examples path is not found.
- */
-async function getExamplesPath(
-    project: string,
-    exampleType: ExampleType
-): Promise<string> {
-    const projectInfo = (
-        await db.collection("projects").doc(project).get()
-    ).data()
-
-    console.log(projectInfo)
-
-    if (!projectInfo) {
-        throw new Error("Project info not found")
-    }
-
-    const examplesPath = projectInfo[exampleType]
-
-    if (!examplesPath) {
-        throw new Error("No examples path found for project")
-    }
-
-    return examplesPath
 }
 
 /**

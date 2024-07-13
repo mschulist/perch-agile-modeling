@@ -2,9 +2,6 @@
 import { getAuth, User } from "firebase/auth"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { getFirebaseConfig } from "@/utils/firebase_config"
-
-const { app, provider, db } = getFirebaseConfig()
 
 /**
  * Renders the authentication component.

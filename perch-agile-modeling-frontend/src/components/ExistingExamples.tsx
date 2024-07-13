@@ -1,11 +1,8 @@
 "use client"
-import {
-    Example,
-    existingLabeledOutput,
-} from "@/models/existingExamples"
+import { Example, existingLabeledOutput } from "@/models/existingExamples"
 import { useProject } from "./Auth"
 import { useState } from "react"
-import Image from "next/image"
+import ExistingLabeledExamples from "./ExistingLabeledExamples"
 
 export default function ExistingExamplesComponent({
     examples,
@@ -50,7 +47,9 @@ export default function ExistingExamplesComponent({
                 </h2>
             )}
             <div className="flex flex-row min-w-80">
-                <div className={`flex flex-row h-[42rem] overflow-y-scroll min-w-60 m-10`}>
+                <div
+                    className={`flex flex-row h-[42rem] overflow-y-scroll min-w-60 m-10`}
+                >
                     <ul className="list-disc pl-4">
                         {examples.map((example) => (
                             <li
@@ -70,34 +69,9 @@ export default function ExistingExamplesComponent({
                     </ul>
                 </div>
                 {labeledExamples.length > 0 && (
-                    <div className="flex flex-col m-10 w-full">
-                        <ul className="list-disc px-5 h-[42rem] overflow-y-scroll">
-                            {labeledExamples.map((example) => (
-                                <li
-                                    key={`${example.filename}.${example.audio_url}`}
-                                >
-                                    Filename: {example.filename}
-                                    <br />
-                                    Timestamp: {example.timestampS} seconds
-                                    {example.spec_url && (
-                                        <Image
-                                            src={example.spec_url}
-                                            alt=""
-                                            height={600}
-                                            width={600}
-                                            className="rounded-xl"
-                                        />
-                                    )}
-                                    <br />
-                                    <audio
-                                        src={example.audio_url}
-                                        controls
-                                        className="pb-4"
-                                    />
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                    <ExistingLabeledExamples
+                        labeledExamples={labeledExamples}
+                    />
                 )}
             </div>
         </div>

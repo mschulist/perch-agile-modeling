@@ -1,5 +1,6 @@
 import Markdown from "react-markdown"
 import { readFileSync } from "fs"
+import AutoSuggestLabel from "./AutoSuggestLabel"
 
 export default function HomePage() {
     const markdown = readFileSync(

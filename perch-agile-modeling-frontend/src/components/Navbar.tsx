@@ -10,7 +10,7 @@ import { getFirebaseConfig } from "@/utils/firebase_config"
 import UserIcon from "./UserIcon"
 import { useAuth } from "./Auth"
 
-const { app, provider, db } = getFirebaseConfig()
+const app = getFirebaseConfig()
 
 // TODO: add more paths when more pages are added
 
