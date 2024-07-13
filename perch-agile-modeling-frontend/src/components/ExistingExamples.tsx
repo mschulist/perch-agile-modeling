@@ -7,6 +7,7 @@ import {
 import { useProject } from "./Auth"
 import { useState } from "react"
 import SpectrogramComponent from "./Spectrogram"
+import Image from "next/image"
 
 export default function ExistingExamplesComponent({
     examples,
@@ -50,8 +51,8 @@ export default function ExistingExamplesComponent({
                     {labeledExamples[0].exampleClass}
                 </h2>
             )}
-            <div className="flex flex-row">
-                <div className="flex flex-row h-[42rem] overflow-y-scroll w-full m-10">
+            <div className="flex flex-row min-w-80">
+                <div className={`flex flex-row h-[42rem] overflow-y-scroll min-w-60 m-10`}>
                     <ul className="list-disc pl-4">
                         {examples.map((example) => (
                             <li
@@ -79,11 +80,17 @@ export default function ExistingExamplesComponent({
                                 >
                                     Filename: {example.filename}
                                     <br />
-                                    Timestamp: {example.timestampS}
+                                    Timestamp: {example.timestampS} seconds
+                                    {example.spec_url && (
+                                        <Image
+                                            src={example.spec_url}
+                                            alt=""
+                                            height={600}
+                                            width={600}
+                                            className="rounded-xl"
+                                        />
+                                    )}
                                     <br />
-                                    <SpectrogramComponent
-                                        audioUrl={example.audio_url}
-                                    />
                                     <audio
                                         src={example.audio_url}
                                         controls

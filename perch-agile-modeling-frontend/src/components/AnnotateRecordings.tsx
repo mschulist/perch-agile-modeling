@@ -53,10 +53,7 @@ export default function AnnotateRecordings() {
 
     return (
         <div className="flex self-center py-10 h-full px-16">
-            <div className="flex flex-col justify-start w-1/4 p-4">
-                <AnnotationDirections />
-            </div>
-            <div className="flex flex-col w-1/2">
+            <div className="flex flex-col w-full align-top">
                 <Button
                     variant="outline"
                     className="m-2 self-center"

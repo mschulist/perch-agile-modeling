@@ -14,6 +14,11 @@ import pathlib from "path"
 const FIREBASE_SERVICE_ACCOUNT = JSON.parse(
     process.env.FIREBASE_SERVICE_ACCOUNT as string
 )
+const GS_SERVICE_ACCOUNT = JSON.parse(process.env.GS_SERVICE_ACCOUNT as string)
+
+const storage = new Storage({
+    credentials: GS_SERVICE_ACCOUNT,
+})
 
 /**
  * Initializes the Firebase app with the provided service account credentials.
@@ -58,22 +63,42 @@ async function getExamplesSingleFolder(
     exampleClass: string,
     precomputed_dir: string
 ): Promise<existingLabeledOutput[]> {
-    const storage = new Storage()
     const { bucket, path } = splitPathIntoBucketAndPath(examplesPath)
     const exampleClassPath = pathlib.join(path, exampleClass)
     const files = (
         await storage.bucket(bucket).getFiles({ prefix: exampleClassPath })
     )[0]
-    const examples: existingLabeledOutput[] = files.map((file) => {
+    const examplesPromises = files.map(async (file) => {
         const name = file.name
         const basename = pathlib.basename(name)
         let [filename, timestampS] = basename.split("__")
         timestampS = timestampS.split(".")[0] // remove file extension
-        file.getSignedUrl
         const gsuri = `gs://${bucket}/${path}/${exampleClass}/${basename}`
-        const audio_url = `https://storage.googleapis.com/${bucket}/${path}/${exampleClass}/${basename}`
-        return { exampleClass, filename, timestampS, gsuri, audio_url }
+        const audio_url = (
+            await file.getSignedUrl({
+                expires: Date.now() + 1000 * 60 * 60 * 24 * 1,
+                action: "read",
+            })
+        )[0]
+        const spec_url = await getPrecomputedSpecUrl(
+            precomputed_dir,
+            filename,
+            timestampS
+        )
+        if (!spec_url) {
+            return { exampleClass, filename, timestampS, gsuri, audio_url }
+        }
+
+        return {
+            exampleClass,
+            filename,
+            timestampS,
+            gsuri,
+            audio_url,
+            spec_url,
+        }
     })
+    const examples = await Promise.all(examplesPromises)
     return examples
 }
 
@@ -81,15 +106,25 @@ async function getPrecomputedSpecUrl(
     precomputed_dir: string,
     filename: string,
     timestampS: string
-): Promise<string> {
-    const storage = new Storage()
+): Promise<string | null> {
     const { bucket, path } = splitPathIntoBucketAndPath(precomputed_dir)
     const fileglob = pathlib.join(path, `*${filename}*${timestampS}*.png`)
-    const file = (
+    console.log(fileglob)
+    const files = (
         await storage.bucket(bucket).getFiles({ matchGlob: fileglob })
-    )[0][0]
-    console.log(file)
-    return file.publicUrl()
+    )[0]
+    if (files.length === 0) {
+        return null
+    }
+
+    const spec_url = (
+        await files[0].getSignedUrl({
+            expires: Date.now() + 1000 * 60 * 60 * 24 * 1,
+            action: "read",
+        })
+    )[0]
+    console.log(spec_url)
+    return spec_url
 }
 
 /**

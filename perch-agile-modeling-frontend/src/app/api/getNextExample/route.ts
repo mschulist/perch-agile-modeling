@@ -18,12 +18,10 @@ export async function POST(request: Request) {
         alreadyLabeled
     )
     if (example === null) {
-        return new Response(
-            JSON.stringify({
-                success: false,
-                error: "No more examples to label, you're done!",
-            })
-        )
+        return NextResponse.json({
+            success: false,
+            error: "No more examples to label, you're done!",
+        })
     }
     await addToAlreadyLabeledFile(alreadyLabeledFile, example)
     console.log(example)
@@ -38,22 +36,45 @@ async function getNextExample(
 
     const precomputedExamples = await storage
         .bucket(bucket)
-        .getFiles({ matchGlob: `${path}*.wav` })
+        .getFiles({ matchGlob: `${path}*` })
 
-    const examples = precomputedExamples[0].map((file) => {
-        return pathlib.basename(file.name)
+    let examples: { [key: string]: { spec?: any; audio?: any } } = {}
+    precomputedExamples[0].forEach((example) => {
+        const basename = pathlib.basename(example.name).slice(0, -4)
+        if (example.name.endsWith(".png")) {
+            if (basename in examples) {
+                examples[basename].spec = example
+            } else {
+                examples[basename] = {
+                    spec: example,
+                }
+            }
+        } else if (example.name.endsWith(".wav")) {
+            if (basename in examples) {
+                examples[basename].audio = example
+            } else {
+                examples[basename] = {
+                    audio: example,
+                }
+            }
+        }
     })
 
-    for (const example of examples) {
-        if (!alreadyLabeled.has(example)) {
-            let [filename, timestampS, species] = example.split("^_^")
-            species = species.slice(0, -4)
-            const audio_url = `https://storage.googleapis.com/${bucket}/${path}${example}`
-            const spec_url = `https://storage.googleapis.com/${bucket}/${path}${example.slice(
-                0,
-                -4
-            )}.png`
-            const gsuri = `gs://${bucket}/${path}${example}`
+    for (const example of Object.values(examples)) {
+        const basename = pathlib.basename(example.spec.name).slice(0, -4)
+        if (!alreadyLabeled.has(basename)) {
+            let [filename, timestampS, species] = basename.split("^_^")
+
+            const audio_url = (await example.audio.getSignedUrl({
+                action: "read",
+                expires: Date.now() + 15 * 60 * 1000,
+            }))[0]
+            const spec_url = (await example.spec.getSignedUrl({
+                action: "read",
+                expires: Date.now() + 15 * 60 * 1000,
+            }))[0]
+
+            const gsuri = `gs://${bucket}/${path}${basename}.wav`
             const precomputedExample: precomputedExample = {
                 gsuri,
                 audio_url,
