@@ -11,6 +11,24 @@ export default function LabeledOutputsPage() {
 
     const project = useProject()
 
+    const getExamples = async () => {
+        fetch("api/getExamples", {
+            method: "POST",
+            body: JSON.stringify({
+                project: project,
+                exampleType: EXAMPLE_TYPE,
+            }),
+        }).then(async (res) => {
+            const data = await res.json()
+            if (!data.success) {
+                console.error("Error occurred during fetch:", data.error)
+                return
+            }
+            console.log(data)
+            setTargetRecordings(data.examples)
+        })
+    }
+
     useEffect(() => {
         if (!project) {
             return
@@ -45,6 +63,7 @@ export default function LabeledOutputsPage() {
                     <ExistingExamplesComponent
                         examples={targetRecordings}
                         exampleType={EXAMPLE_TYPE}
+                        getExamples={getExamples}
                     />
                 </div>
             )}
