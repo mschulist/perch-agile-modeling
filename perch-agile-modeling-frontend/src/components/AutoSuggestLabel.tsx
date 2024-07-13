@@ -1,68 +1,62 @@
-import { useState } from "react"
-import AutoSuggest from "react-autosuggest"
+import React, { useState } from "react"
+import { Input } from "./ui/input"
 
-export default function AutoSuggestLabel({
-    label,
-    setLabel,
+const InputWithSuggestions = ({
     suggestions,
+    customSpecies,
+    setCustomSpecies,
 }: {
-    label: string
-    setLabel: (label: string) => void
     suggestions: string[]
-}) {
-    const [value, setValue] = useState(label)
-    const [suggestionsList, setSuggestionsList] = useState<string[]>([])
+    customSpecies: string
+    setCustomSpecies: (species: string) => void
+}) => {
+    const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([])
 
-    function getSuggestions(value: string) {
-        const inputValue = value.trim().toLowerCase()
-        const inputLength = inputValue.length
+    console.log(customSpecies)
 
-        return inputLength === 0
-            ? []
-            : suggestions.filter(
-                  (suggestion) =>
-                      suggestion.toLowerCase().slice(0, inputLength) ===
-                      inputValue
-              )
+    const handleChange = (e: any) => {
+        const value = e.target.value
+        setCustomSpecies(value)
+
+        if (value) {
+            const filtered = suggestions.filter((suggestion) =>
+                suggestion.toLowerCase().startsWith(value.toLowerCase())
+            )
+            setFilteredSuggestions(filtered.slice(0, 3)) // limit to 3 suggestions
+        } else {
+            setFilteredSuggestions([])
+        }
     }
 
-    function onSuggestionsFetchRequested({ value }: { value: string }) {
-        setSuggestionsList(getSuggestions(value))
-    }
-
-    function onSuggestionsClearRequested() {
-        setSuggestionsList([])
-    }
-
-    function onSuggestionSelected(
-        event: React.FormEvent<HTMLFormElement>,
-        { suggestion }: { suggestion: string }
-    ) {
-        setLabel(suggestion)
-    }
-
-    function onChange(
-        event: React.FormEvent<HTMLElement>,
-        { newValue }: { newValue: string }
-    ) {
-        setValue(newValue)
-    }
-
-    const inputProps = {
-        placeholder: "Label",
-        value,
-        onChange: onChange,
+    const handleSuggestionClick = (suggestion: string) => {
+        setCustomSpecies(suggestion)
+        setFilteredSuggestions([])
     }
 
     return (
-        <AutoSuggest
-            suggestions={suggestionsList}
-            onSuggestionsFetchRequested={onSuggestionsFetchRequested}
-            onSuggestionsClearRequested={onSuggestionsClearRequested}
-            onSuggestionSelected={onSuggestionSelected}
-            getSuggestionValue={(suggestion) => suggestion}
-            renderSuggestion={(suggestion) => <div>{suggestion}</div>}
-            inputProps={inputProps}
-        />
+        <div className="relative">
+            <Input
+                type="text"
+                value={customSpecies}
+                onChange={handleChange}
+                className="w-full ml-2 p-1 transition duration-100 text-center"
+                placeholder="species_type"
+            />
+            {filteredSuggestions.length > 0 && (
+                <ul className="absolute left-0 right-0 mt-1 bg-black rounded shadow-lg transition duration-300 list-none">
+                    {filteredSuggestions.map((suggestion, index) => (
+                        <li
+                            key={index}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="px-4 py-2 cursor-pointer hover:bg-gray-800 transition duration-100 text-center"
+                        >
+                            {suggestion}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     )
 }
+
+export default InputWithSuggestions
