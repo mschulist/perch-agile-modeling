@@ -25,8 +25,8 @@ export default function ExistingLabeledExamples({
                             <Image
                                 src={example.spec_url}
                                 alt=""
-                                height={250}
-                                width={250}
+                                height={450}
+                                width={450}
                                 className="rounded-xl"
                             />
                         )}
