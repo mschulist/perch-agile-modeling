@@ -1,14 +1,7 @@
 "use client"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import ExistingExamplesComponent from "./ExistingExamples"
-import {
-    Example,
-    ExampleType,
-    ExistingExamples,
-} from "@/models/existingExamples"
-import { get } from "http"
-import { getFirebaseConfig } from "@/utils/firebase_config"
-import { collection, doc, getDocs } from "firebase/firestore"
+import { Example, ExampleType } from "@/models/existingExamples"
 import { useProject } from "./Auth"
 
 const EXAMPLE_TYPE: ExampleType = "targetRecordings"

@@ -1,13 +1,9 @@
 "use client"
-import { initializeApp } from "firebase/app"
-import { getAnalytics } from "firebase/analytics"
 import {
     getAuth,
-    GoogleAuthProvider,
     signInWithPopup,
     User,
 } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { getFirebaseConfig } from "@/utils/firebase_config"

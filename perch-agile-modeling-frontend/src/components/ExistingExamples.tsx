@@ -1,12 +1,10 @@
 "use client"
 import {
     Example,
-    ExistingExamples,
     existingLabeledOutput,
 } from "@/models/existingExamples"
 import { useProject } from "./Auth"
 import { useState } from "react"
-import SpectrogramComponent from "./Spectrogram"
 import Image from "next/image"
 
 export default function ExistingExamplesComponent({

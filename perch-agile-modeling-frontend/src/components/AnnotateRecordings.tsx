@@ -1,12 +1,10 @@
 "use client"
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useState } from "react"
 import Image from "next/image"
 import { precomputedExample } from "@/models/precomputedExample"
 import { Button } from "./ui/button"
 import AnnotationButtons from "./AnnotationButtons"
 import { useAuth, useProject } from "./Auth"
-import { set } from "firebase/database"
-import AnnotationDirections from "./AnnotationDirections"
 
 const voc_types = ["call", "song"]
 

@@ -1,6 +1,5 @@
 "use client"
 import { Example, ExampleType } from "@/models/existingExamples"
-import Link from "next/link"
 import { useState, useEffect } from "react"
 import ExistingExamplesComponent from "./ExistingExamples"
 import { useProject } from "./Auth"

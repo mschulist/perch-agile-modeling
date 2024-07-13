@@ -1,7 +1,6 @@
 "use client"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { set } from "firebase/database"
 import { useState } from "react"
 import { CheckSourceInfoResponse } from "@/models/sourceInfos"
 import { SourceInfoEmbedButton } from "./SourceInfoEmbedButton"

@@ -1,16 +1,9 @@
 "use client"
-import React, { use, useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { User, getAuth } from "firebase/auth"
+import React, {  } from "react"
+import { useRouter } from "next/navigation"
 import {
     NavigationMenu,
-    NavigationMenuContent,
-    NavigationMenuIndicator,
-    NavigationMenuItem,
-    NavigationMenuLink,
     NavigationMenuList,
-    NavigationMenuTrigger,
-    NavigationMenuViewport,
 } from "@/components/ui/navigation-menu"
 import SignOut from "./SignOut"
 import { getFirebaseConfig } from "@/utils/firebase_config"
