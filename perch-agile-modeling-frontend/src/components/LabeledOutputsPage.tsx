@@ -33,6 +33,23 @@ export default function LabeledOutputsPage() {
         if (!project) {
             return
         }
+        const getExamples = async () => {
+            fetch("api/getExamples", {
+                method: "POST",
+                body: JSON.stringify({
+                    project: project,
+                    exampleType: EXAMPLE_TYPE,
+                }),
+            }).then(async (res) => {
+                const data = await res.json()
+                if (!data.success) {
+                    console.error("Error occurred during fetch:", data.error)
+                    return
+                }
+                console.log(data)
+                setLabeledOutputs(data.examples)
+            })
+        }
 
         getExamples()
     }, [project])
