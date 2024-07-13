@@ -53,7 +53,7 @@ async function getExamplesSingleFolder(
     const examplesPromises = files.map(async (file) => {
         const name = file.name
         const basename = pathlib.basename(name)
-        let [filename, timestampS] = basename.split("__")
+        let [filename, timestampS] = basename.split("___")
         timestampS = timestampS.split(".")[0] // remove file extension
         const gsuri = `gs://${bucket}/${path}/${exampleClass}/${basename}`
         const audio_url = (
