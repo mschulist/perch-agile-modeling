@@ -27,7 +27,7 @@ export default function ExistingLabeledExamples({
                                 alt=""
                                 height={480}
                                 width={640}
-                                quality={30}
+                                unoptimized
                                 className="rounded-xl h-full w-[640px]"
                             />
                         )}

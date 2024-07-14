@@ -88,7 +88,7 @@ export default function MoveLabeledExampleDialog({
                                 alt=""
                                 height={480}
                                 width={640}
-                                quality={30}
+                                unoptimized
                                 className="rounded-xl w-full h-auto"
                             />
                         )}
