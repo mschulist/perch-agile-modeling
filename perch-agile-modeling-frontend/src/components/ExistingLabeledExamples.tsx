@@ -41,6 +41,7 @@ export default function ExistingLabeledExamples({
                             src={example.audio_url}
                             controls
                             className="pb-4"
+                            preload="none"
                         />
                     </li>
                 ))}
