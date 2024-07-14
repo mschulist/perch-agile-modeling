@@ -25,12 +25,12 @@ export default function ExistingLabeledExamples({
                             <Image
                                 src={example.spec_url}
                                 alt=""
-                                height={450}
-                                width={450}
-                                className="rounded-xl"
+                                height={480}
+                                width={640}
+                                quality={30}
+                                className="rounded-xl h-full w-[640px]"
                             />
                         )}
-                        <br />
                         <MoveLabeledExampleDialog
                             example={example}
                             exampleClasses={exampleClasses}

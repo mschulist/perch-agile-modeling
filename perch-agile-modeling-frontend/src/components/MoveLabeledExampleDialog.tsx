@@ -57,7 +57,7 @@ export default function MoveLabeledExampleDialog({
             <DialogTrigger asChild>
                 <Button
                     variant="outline"
-                    className="bg-green-700 hover:bg-green-800 mb-2"
+                    className="bg-green-700 hover:bg-green-800 my-2"
                 >
                     Move Example
                 </Button>
@@ -86,9 +86,10 @@ export default function MoveLabeledExampleDialog({
                             <Image
                                 src={example.spec_url}
                                 alt=""
-                                height={600}
-                                width={600}
-                                className="rounded-xl"
+                                height={480}
+                                width={640}
+                                quality={30}
+                                className="rounded-xl w-full h-auto"
                             />
                         )}
                         <br />
