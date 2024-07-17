@@ -55,7 +55,7 @@ export default function LabeledOutputsPage() {
     }, [project])
 
     return (
-        <div className="flex flex-col justify-center items-center h-5/6">
+        <div className="flex flex-col justify-center items-center">
             {labeledOutputs.length > 0 && (
                 <div className="flex flex-col">
                     <h2 className="text-2xl font-bold py-2 self-center">

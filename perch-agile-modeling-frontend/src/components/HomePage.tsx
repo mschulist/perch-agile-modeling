@@ -7,7 +7,7 @@ export default function HomePage() {
         "utf-8"
     )
     return (
-        <div className="flex-col justify-center h-screen">
+        <div className="flex-col justify-center">
             <Markdown>{markdown}</Markdown>
         </div>
     )

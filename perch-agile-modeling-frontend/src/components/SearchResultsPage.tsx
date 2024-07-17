@@ -54,7 +54,7 @@ export default function LabeledOutputsPage() {
     }, [project])
 
     return (
-        <div className="flex flex-col justify-center items-center h-screen">
+        <div className="flex flex-col justify-center items-center">
             {targetRecordings.length > 0 && (
                 <div className="flex flex-col">
                     <h2 className="text-2xl font-bold py-2">

@@ -28,7 +28,7 @@ const Navbar: React.FC = () => {
     ]
 
     return (
-        <div className="flex justify-start items-center p-4">
+        <div className="flex justify-between items-center p-4">
             <NavigationMenu>
                 <NavigationMenuList>
                     {paths.map(
@@ -37,7 +37,7 @@ const Navbar: React.FC = () => {
                                 <button
                                     onClick={() => router.push(path.href)}
                                     key={path.href}
-                                    className="p-4  rounded-2xl hover:text-red-400 transition-colors duration-300 ease-in-out"
+                                    className="p-4 rounded-2xl hover:text-red-400 transition-colors duration-300 ease-in-out"
                                 >
                                     {path.label}
                                 </button>
@@ -46,7 +46,7 @@ const Navbar: React.FC = () => {
                 </NavigationMenuList>
             </NavigationMenu>
 
-            <NavigationMenu className="absolute right-0 p-4">
+            <NavigationMenu className="justify-end">
                 <NavigationMenuList>
                     {user?.displayName && (
                         <p className="text-white">

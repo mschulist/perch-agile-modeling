@@ -90,6 +90,19 @@ export default function AnnotationButtons({
             >
                 no birds present
             </Button>
+
+            <p className="self-center p-2">If you would like to review later:</p>
+            <Button
+                variant="outline"
+                className="m-2 self-center"
+                value="review"
+                onClick={() => {
+                    annotateRecording("review")
+                    getNextExample()
+                }}
+            >
+                review later
+            </Button>
         </div>
     )
 }

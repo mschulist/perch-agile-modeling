@@ -7,7 +7,6 @@ import { useProject } from "./Auth"
 const EXAMPLE_TYPE: ExampleType = "targetRecordings"
 
 export default function TargetRecordings() {
-    // const [project, setProject] = useState<string>("caples-testing")
     const [targetRecordings, setTargetRecordings] = useState<Example[]>([])
 
     const project = useProject()
@@ -55,7 +54,7 @@ export default function TargetRecordings() {
     }, [project])
 
     return (
-        <div className="flex flex-col justify-center items-center h-screen">
+        <div className="flex flex-col justify-center items-center">
             {targetRecordings.length > 0 && (
                 <div className="flex flex-col">
                     <h2 className="text-2xl font-bold py-2">

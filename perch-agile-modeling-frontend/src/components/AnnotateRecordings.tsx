@@ -76,7 +76,7 @@ export default function AnnotateRecordings() {
     }
 
     return (
-        <div className="flex self-center py-10 h-full px-16">
+        <div className="flex self-center py-10 px-16">
             <div className="flex flex-col w-full align-top">
                 <Button
                     variant="outline"
@@ -85,27 +85,31 @@ export default function AnnotateRecordings() {
                 >
                     Skip Recording
                 </Button>
-                {example && (
-                    <>
-                        <Image
-                            src={example.spec_url}
-                            alt=""
-                            width={500}
-                            height={500}
-                            className="m-4 rounded-xl self-center"
-                        />
-                        <audio
-                            controls
-                            src={example.audio_url}
-                            className="m-4 self-center"
-                        />
-                        <AnnotationButtons
-                            example={example}
-                            getNextExample={getNextExample}
-                            exampleClasses={exampleClasses}
-                        />
-                    </>
-                )}
+                <div className="flex flex-row self-center m-10">
+                    {example && (
+                        <>
+                        <div className="flex flex-col self-center pr-8">
+                            <Image
+                                src={example.spec_url}
+                                alt=""
+                                width={500}
+                                height={500}
+                                className="m-4 rounded-xl self-center"
+                            />
+                            <audio
+                                controls
+                                src={example.audio_url}
+                                className="m-4 self-center"
+                            />
+                            </div>
+                            <AnnotationButtons
+                                example={example}
+                                getNextExample={getNextExample}
+                                exampleClasses={exampleClasses}
+                            />
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     )

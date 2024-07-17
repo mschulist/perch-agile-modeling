@@ -14,6 +14,7 @@ const db = getAdminFirestoreDB()
 
 const storage = getGoogleStorage()
 
+
 export async function POST(request: Request): Promise<NextResponse> {
     const { project, example, voc_type } = await request.json()
 
@@ -24,6 +25,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     let newSpecies = `${example.species}_${voc_type}`
     if (voc_type === "unknown") {
         newSpecies = "unknown"
+    } else if (voc_type === "review") {
+        newSpecies = "review"
     }
 
     const labeledOutputLocation = await getLabeledOutputLocation(project, db)

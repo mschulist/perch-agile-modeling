@@ -94,6 +94,8 @@ export default function ExistingExamplesComponent({
                                     className={
                                         example.class === "unknown"
                                             ? "text-red-400"
+                                            : example.class === "review"
+                                            ? "text-yellow-400"
                                             : ""
                                     }
                                 >
