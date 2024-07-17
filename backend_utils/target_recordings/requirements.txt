@@ -1,0 +1,4 @@
+chirp @ git+https://github.com/google-research/perch.git
+numpy
+pandas
+tensorflow
