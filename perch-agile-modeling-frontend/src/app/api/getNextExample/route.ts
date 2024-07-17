@@ -28,7 +28,6 @@ export async function POST(request: Request) {
             error: "No more examples to label, you're done!",
         })
     }
-    await addToAlreadyLabeledFile(alreadyLabeledFile, example)
     return NextResponse.json({ success: true, example })
 }
 
@@ -67,7 +66,11 @@ async function getNextExample(
     for (const example of Object.values(examples)) {
         const basename = pathlib.basename(example.spec.name).slice(0, -4)
         // check to see if the example has an audio file AND a spectrogram file
-        if (!alreadyLabeled.has(`${basename}.wav`) && example.audio && example.spec) {
+        if (
+            !alreadyLabeled.has(`${basename}.wav`) &&
+            example.audio &&
+            example.spec
+        ) {
             let [filename, timestampS, species] = basename.split("^_^")
             const audio_url = (
                 await example.audio.getSignedUrl({
@@ -108,13 +111,3 @@ async function getAlreadyLabeledExamples(
     return alreadyLabeledLines
 }
 
-async function addToAlreadyLabeledFile(
-    alreadyLabeledFile: string,
-    example: precomputedExample
-) {
-    const { bucket, path } = splitPathIntoBucketAndPath(alreadyLabeledFile)
-    let file = (await storage.bucket(bucket).file(path).download()).toString()
-    const currDatetime = new Date().toISOString()
-    file += `${currDatetime}\n${example.filename}^_^${example.timestampS}^_^${example.species}.wav\n`
-    await storage.bucket(bucket).file(path).save(file)
-}

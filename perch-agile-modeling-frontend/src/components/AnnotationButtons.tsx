@@ -2,17 +2,18 @@ import { precomputedExample } from "@/models/precomputedExample"
 import { Button } from "./ui/button"
 import { useAuth, useProject } from "./Auth"
 import { useState } from "react"
-import { Input } from "./ui/input"
 import AutoSuggestLabel from "./AutoSuggestLabel"
 
 export default function AnnotationButtons({
     example,
     getNextExample,
     exampleClasses,
+    finishAnnotation,
 }: {
     example: precomputedExample
     getNextExample: () => void
     exampleClasses: string[]
+    finishAnnotation: () => Promise<void>
 }) {
     const voc_types = ["call", "song"]
     const [customSpecies, setCustomSpecies] = useState<string>("")
@@ -20,17 +21,18 @@ export default function AnnotationButtons({
     const user = useAuth()
     const project = useProject()
 
-    function annotateRecording(voc_type: string) {
+    async function annotateRecording(label: string) {
         fetch("api/annotateRecording", {
             method: "POST",
             body: JSON.stringify({
                 project: project,
                 example: example,
-                voc_type: voc_type,
+                label: label,
                 user: user,
             }),
         }).then(async (res) => {
             const data = await res.json()
+            console.log("annotation response", data)
             if (!data.success) {
                 console.error("Error occurred during fetch:", data.error)
                 return
@@ -48,8 +50,13 @@ export default function AnnotationButtons({
                     className="m-2 self-center"
                     value={voc_type}
                     onClick={() => {
-                        annotateRecording(voc_type)
-                        getNextExample()
+                        finishAnnotation().then(() => {
+                            annotateRecording(
+                                `${example.species}_${voc_type}`
+                            ).then(() => {
+                                getNextExample()
+                            })
+                        })
                     }}
                 >
                     {`${example.species}_${voc_type}`}
@@ -70,8 +77,13 @@ export default function AnnotationButtons({
                 className="m-2 self-center"
                 value={customSpecies}
                 onClick={() => {
-                    annotateRecording(customSpecies)
-                    getNextExample()
+                    finishAnnotation().then(() => {
+                        console.log("finishing annotation")
+                        annotateRecording(customSpecies).then(() => {
+                            console.log("getting next example")
+                            getNextExample()
+                        })
+                    })
                 }}
                 style={{ display: customSpecies === "" ? "none" : "block" }}
             >
@@ -84,21 +96,29 @@ export default function AnnotationButtons({
                 className="m-2 self-center"
                 value="unknown"
                 onClick={() => {
-                    annotateRecording("unknown")
-                    getNextExample()
+                    finishAnnotation().then(() => {
+                        annotateRecording("unknown").then(() => {
+                            getNextExample()
+                        })
+                    })
                 }}
             >
                 no birds present
             </Button>
 
-            <p className="self-center p-2">If you would like to review later:</p>
+            <p className="self-center p-2">
+                If you would like to review later:
+            </p>
             <Button
                 variant="outline"
                 className="m-2 self-center"
                 value="review"
                 onClick={() => {
-                    annotateRecording("review")
-                    getNextExample()
+                    finishAnnotation().then(() => {
+                        annotateRecording("review").then(() => {
+                            getNextExample()
+                        })
+                    })
                 }}
             >
                 review later
