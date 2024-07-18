@@ -2,6 +2,8 @@ FROM --platform=amd64 tensorflow/tensorflow:2.17.0-gpu
 
 COPY . /app
 
+WORKDIR /app
+
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     git \
@@ -11,8 +13,8 @@ RUN apt-get update && apt-get install -y \
 
 # Install python dependencies
 RUN pip install --upgrade pip
-RUN pip install -r /app/requirements.txt
+RUN pip install -r requirements.txt
 
 # Run the application with parameters
 
-ENTRYPOINT ["sh", "/app/run.sh"]
+ENTRYPOINT ["sh", "run.sh"]
