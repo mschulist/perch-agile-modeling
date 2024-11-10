@@ -30,3 +30,9 @@ class AccountsDB:
         with Session(self.engine) as session:
             session.add(user)
             session.commit()
+
+    def get_project(self, project_id: int) -> Optional[Project]:
+        with Session(self.engine) as session:
+            statement = select(Project).where(Project.id == project_id)
+            project = session.exec(statement).first()
+            return project

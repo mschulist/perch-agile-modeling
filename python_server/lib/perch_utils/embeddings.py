@@ -1,0 +1,22 @@
+import os
+from chirp.projects.agile2.convert_legacy import convert_tfrecords  # type: ignore
+
+
+def convert_legacy_tfrecords(
+    project_id: int,
+    embeddings_path: str,
+    db_type: str,
+):
+    db_path = f"data/perch_db/perch_{project_id}.db"
+    if os.path.exists(db_path):
+        return False
+    try:
+        convert_tfrecords(
+            embeddings_path=embeddings_path,
+            db_path=db_path,
+            db_type=db_type,
+            dataset_name=str(project_id),
+        )
+    except Exception:
+        return False
+    return True

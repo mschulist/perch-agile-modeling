@@ -3,6 +3,10 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from .lib.perch_utils.embeddings import convert_legacy_tfrecords
+
+from .lib.perch_utils.projects import setup_perch_db
+
 from .lib.auth import (
     authenticate_user,
     create_access_token,
@@ -50,7 +54,9 @@ async def login_for_access_token(
 
 @app.post("/create_project")
 async def create_project(
-    current_user: Annotated[User, Depends(get_current_user)], name: str, description: str
+    current_user: Annotated[User, Depends(get_current_user)],
+    name: str,
+    description: str,
 ):
     p = Project(name=name, description=description, owner_id=current_user.id)
     project = db.create_project(p)
@@ -72,3 +78,44 @@ async def my_projects(
 ):
     user = db.session.merge(current_user)
     return user.owned_projects
+
+
+@app.post("/create_project_db")
+async def create_project_db(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    dataset_base_path: str,
+    dataset_fileglob: str,
+    model_choice: str = "perch_8",
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    success = setup_perch_db(project_id, dataset_base_path, dataset_fileglob, model_choice)
+
+    if not success:
+        raise HTTPException(status_code=400, detail="DB already exists")
+    return {"success": success}
+
+
+@app.post("/create_project_db_legacy")
+async def create_project_db_legacy(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    embeddings_path: str,
+    db_type: str,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    success = convert_legacy_tfrecords(project_id, embeddings_path, db_type)
+
+    if not success:
+        raise HTTPException(status_code=400, detail="DB already exists")
+    return {"success": success}
