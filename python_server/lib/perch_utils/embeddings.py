@@ -9,14 +9,12 @@ def convert_legacy_tfrecords(
 ):
     db_path = f"data/perch_db/perch_{project_id}.db"
     if os.path.exists(db_path):
-        return False
-    try:
-        convert_tfrecords(
-            embeddings_path=embeddings_path,
-            db_path=db_path,
-            db_type=db_type,
-            dataset_name=str(project_id),
-        )
-    except Exception:
-        return False
+        raise ValueError(f"DB path {db_path} already exists.")
+    convert_tfrecords(
+        embeddings_path=embeddings_path,
+        db_path=db_path,
+        db_type=db_type,
+        dataset_name=str(project_id),
+    )
+
     return True

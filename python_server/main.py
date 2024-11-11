@@ -114,7 +114,10 @@ async def create_project_db_legacy(
     if project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    success = convert_legacy_tfrecords(project_id, embeddings_path, db_type)
+    try:
+        success = convert_legacy_tfrecords(project_id, embeddings_path, db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     if not success:
         raise HTTPException(status_code=400, detail="DB already exists")

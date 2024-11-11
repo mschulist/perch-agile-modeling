@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, create_engine, Session, select
 from typing import Optional
-from python_server.lib.models import Project, User
+from python_server.lib.models import Project, TargetRecording, User
 
 DB_NAME = "data/database.db"
 sqlite_url = f"sqlite:///{DB_NAME}"
@@ -36,3 +36,27 @@ class AccountsDB:
             statement = select(Project).where(Project.id == project_id)
             project = session.exec(statement).first()
             return project
+
+    def get_target_recordings(self):
+        """
+        Get the list of previously gathered target recordings from the db.
+        """
+        with Session(self.engine) as session:
+            statement = select(TargetRecording)
+            target_recordings = session.exec(statement).all()
+            return target_recordings
+
+    def add_target_recording(self, target_recording: TargetRecording):
+        """
+        Adds a target recording to the database.
+
+        Args:
+            target_recording: The target recording to add to the database.
+
+        Returns:
+            The id of the target recording
+        """
+        with Session(self.engine) as session:
+            session.add(target_recording)
+            session.commit()
+            return target_recording.id
