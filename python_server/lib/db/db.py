@@ -1,16 +1,17 @@
 from sqlmodel import SQLModel, create_engine, Session, select
-from typing import Optional
-from python_server.lib.models import Project, TargetRecording, User
-
-DB_NAME = "data/database.db"
-sqlite_url = f"sqlite:///{DB_NAME}"
-engine = create_engine(sqlite_url)
+from typing import Optional, Sequence
+from python_server.lib.models import FinishedTargetRecording, Project, TargetRecording, User
 
 
 class AccountsDB:
-    def __init__(self):
+    def __init__(self, db_name: str = "data/database.db"):
+        sqlite_url = f"sqlite:///{db_name}"
+        engine = create_engine(sqlite_url)
         self.engine = engine
         self.session = Session(engine)
+
+    def setup(self):
+        SQLModel.metadata.create_all(self.engine)
 
     def get_user(self, email: str) -> Optional[User]:
         with Session(self.engine) as session:
@@ -37,12 +38,32 @@ class AccountsDB:
             project = session.exec(statement).first()
             return project
 
-    def get_target_recordings(self):
+    def get_target_recordings(
+        self, species_code: Optional[str], call_type: Optional[str], project_id: Optional[int]
+    ) -> Sequence[TargetRecording]:
         """
-        Get the list of previously gathered target recordings from the db.
+        Get the list of previously gathered target recordings from the db that have not already been used by the project.
+
+        Args:
+            species_code: Species code of the target recordings.
+            call_type: Call type of the target recordings.
+            project_id: ID of the project.
         """
         with Session(self.engine) as session:
             statement = select(TargetRecording)
+
+            if project_id is not None:
+                statement.outerjoin(
+                    FinishedTargetRecording,
+                ).where(
+                    FinishedTargetRecording.project_id == project_id
+                ).where(FinishedTargetRecording.target_recording_id == TargetRecording.id)
+
+            if species_code is not None:
+                statement = statement.where(TargetRecording.species == species_code)
+            if call_type is not None:
+                statement = statement.where(TargetRecording.call_type == call_type)
+
             target_recordings = session.exec(statement).all()
             return target_recordings
 
@@ -60,3 +81,34 @@ class AccountsDB:
             session.add(target_recording)
             session.commit()
             return target_recording.id
+
+    def get_target_recording(self, target_recording_id: int) -> Optional[TargetRecording]:
+        """
+        Get the target recording with the given id.
+
+        Args:
+            target_recording_id: The id of the target recording to get.
+
+        Returns:
+            The target recording with the given id.
+        """
+        with Session(self.engine) as session:
+            statement = select(TargetRecording).where(TargetRecording.id == target_recording_id)
+            target_recording = session.exec(statement).first()
+            return target_recording
+
+    def finish_target_recording(self, target_recording_id: int) -> None:
+        """
+        Finish the target recording with the given id.
+
+        Just adds the target recording to the finished_target_recordings table.
+
+        Args:
+            target_recording_id: The id of the target recording to finish.
+        """
+        with Session(self.engine) as session:
+            finished_target_recording = FinishedTargetRecording(
+                target_recording_id=target_recording_id
+            )
+            session.add(finished_target_recording)
+            session.commit()

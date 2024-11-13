@@ -41,6 +41,13 @@ class Project(SQLModel, table=True):
     contributors: List[User] = Relationship(
         back_populates="contributing_projects", link_model=ProjectContributor
     )
+    finished_target_recordings: List["FinishedTargetRecording"] = Relationship(
+        back_populates="project"
+    )
+    finished_possible_examples: List["FinishedPossibleExamples"] = Relationship(
+        back_populates="project"
+    )
+    possible_examples: List["PossibleExample"] = Relationship(back_populates="project")
 
 
 class TargetRecording(SQLModel, table=True):
@@ -65,8 +72,13 @@ class TargetRecording(SQLModel, table=True):
     call_type: str = Field(index=True)
     timestamp_s: float = Field(index=True)
 
+    finished_target_recordings: List["FinishedTargetRecording"] = Relationship(
+        back_populates="target_recording"
+    )
+    possible_examples: List["PossibleExample"] = Relationship(back_populates="target_recording")
 
-class FinishedTargetRecordings(SQLModel, table=True):
+
+class FinishedTargetRecording(SQLModel, table=True):
     """
     Table to store all of the target recordings that have already been used to search the dataset.
     """
@@ -101,6 +113,10 @@ class PossibleExample(SQLModel, table=True):
 
     target_recording: Optional[TargetRecording] = Relationship(back_populates="possible_examples")
     project: Optional[Project] = Relationship(back_populates="possible_examples")
+
+    finished_possible_examples: List["FinishedPossibleExamples"] = Relationship(
+        back_populates="possible_example"
+    )
 
 
 class FinishedPossibleExamples(SQLModel, table=True):

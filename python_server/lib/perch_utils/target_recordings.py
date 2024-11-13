@@ -1,8 +1,9 @@
 import time
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 from etils import epath
 import numpy as np
 import requests
+from tqdm import tqdm
 
 from python_server.lib.db.db import AccountsDB
 from python_server.lib.models import TargetRecording
@@ -12,22 +13,21 @@ from chirp import audio_utils
 
 from chirp.taxonomy import namespace_db
 
-TARGET_RECORDINGS_PATH = epath.Path("data/target_recordings")
+# TARGET_RECORDINGS_PATH = epath.Path("data/target_recordings")
 
 
-def get_target_recording_path(target_recording_id: int) -> epath.Path:
+def get_target_recording_path(target_recording_id: int, target_path: epath.Path) -> epath.Path:
     """
     Get the path to the target recording with the given id.
     """
-    return TARGET_RECORDINGS_PATH / f"{target_recording_id}.wav"
+    return target_path / f"{target_recording_id}.wav"
 
 
 class GatherTargetRecordings:
     def __init__(
         self,
         db: AccountsDB,
-        n: int,
-        target_recordings_path: epath.Path,
+        target_path: epath.Path | str,
         sample_rate: int = 32000,
         window_s: float = 5.0,
         max_len_s: float = 60.0,
@@ -42,24 +42,29 @@ class GatherTargetRecordings:
 
         Args:
             db: AccountsDB instance
-            n: Number of target recordings to gather.
-            target_recordings_path: Path to the target recordings.
+            target_path: Path to the target recordings.
             sample_rate: Sample rate of the target recordings.
             window_s: Window size in seconds.
             max_len_s: Maximum length of the target recordings in seconds.
         """
         self.db = db
-        self.n = n
-        self.target_recordings_path = target_recordings_path
+        self.target_path = epath.Path(target_path)
         self.sample_rate = sample_rate
         self.window_s = window_s
         self.max_len_s = max_len_s
 
-    def get_existing_target_recordings(self) -> Sequence[TargetRecording]:
+    def get_existing_target_recordings(
+        self, species_code: str, call_type: str, project_id: Optional[int]
+    ) -> Sequence[TargetRecording]:
         """
         Get the list of previously gathered target recordings from the db.
+
+        Args:
+            species_code: Species code of the target recordings.
+            call_type: Call type of the target recordings.
+            project_id: Project id to determine whether the target recording has been used.
         """
-        return self.db.get_target_recordings()
+        return self.db.get_target_recordings(species_code, call_type, project_id)
 
     def convert_xc_sci_to_ebird_6_code(self, xc_scientific_name: str) -> str:
         """
@@ -93,30 +98,32 @@ class GatherTargetRecordings:
             raise ValueError(f"Mapping not found for {ebird_6_code}.")
         return xc_sci_name
 
-    def get_xc_ids(self, scientific_name: str, voc_type: str) -> Sequence[str]:
+    def get_xc_ids(self, scientific_name: str, call_type: str) -> Sequence[str]:
         """
         Queries the xeno-canto API and returns a list of xeno-canto ids for the given species and vocalization type.
 
         Args:
             scientific_name: Scientific name of the species.
-            voc_type: Vocalization type of the species.
+            call_type: Vocalization type of the species.
 
         Returns:
             List of xeno-canto ids.
         """
 
-        url = f'https://www.xeno-canto.org/api/2/recordings?query={scientific_name} type:"{voc_type}" len:1-{self.max_len_s}'
+        url = f'https://www.xeno-canto.org/api/2/recordings?query={scientific_name} type:"{call_type}" len:1-{self.max_len_s}'
 
         status_code = 0
         response = None
         while status_code != 200:
             response = requests.get(url)
             status_code = response.status_code
-            time.sleep(1)
+            if status_code == 200:
+                break
+            time.sleep(0.25)
 
         if not response:
             raise ValueError(
-                f"Failed to get response from xeno-canto API for {scientific_name} {voc_type}."
+                f"Failed to get response from xeno-canto API for {scientific_name}: {call_type}."
             )
         response_json = response.json()
         return self.filter_xc_response(response_json)
@@ -147,7 +154,7 @@ class GatherTargetRecordings:
             species_code: Species code of the recording.
         """
         try:
-            audio = audio_utils.load_xc_audio(xc_id, sample_rate=self.sample_rate)
+            audio = audio_utils.load_xc_audio(f"xc{xc_id}", sample_rate=self.sample_rate)
             peaks = audio_utils.slice_peaked_audio(
                 audio=audio,
                 sample_rate_hz=self.sample_rate,
@@ -164,10 +171,59 @@ class GatherTargetRecordings:
                 if target_recording_id is None:
                     raise ValueError("Failed to add target recording to the database.")
 
-                output_filepath = get_target_recording_path(target_recording_id)
+                output_filepath = get_target_recording_path(target_recording_id, self.target_path)
                 with tempfile.NamedTemporaryFile() as tmp_file:
                     wavfile.write(tmp_file.name, self.sample_rate, np.float32(audio_slice))
                     epath.Path(tmp_file.name).copy(output_filepath)
         except Exception as e:
             print(f"Error processing xc id {xc_id}: {e}")
             print("This error is likely due to the xeno-canto recording being unavailable.")
+
+    def process_req_for_targets(
+        self,
+        species_codes: Sequence[str],
+        call_types: Sequence[str],
+        num_targets: int,
+        project_id: Optional[int],
+    ) -> None:
+        """
+        Process the request for target recordings. Main method for this class.
+
+        The request will take in the species codes and vocalization types and gather the target recordings.
+
+        For example, if someone wants 5 recordings of "song" and "call" for each of their
+        species of interest, calling this function will make sure that we have 5 recordings of each
+        species and vocalization type in the database. So, calling this function 2 times with the same
+        arguments should result in nothing happening the second time (assuming the db does its job).
+
+        Args:
+            species_codes: List of species codes.
+            call_types: List of vocalization types.
+            num_targets: Number of target recordings to gather.
+            project_id: Project id to determine whether the target recording has been used.
+        """
+        for species in species_codes:
+            for call in call_types:
+                existing_target_recordings = self.get_existing_target_recordings(
+                    species, call, project_id
+                )
+                if len(existing_target_recordings) >= num_targets:
+                    continue
+                xc_sci_name = self.convert_ebird_6_code_to_xc_sci_name(species)
+                xc_ids = self.get_xc_ids(xc_sci_name, call)
+
+                # Make sure that we don't download the same recording twice.
+                existing_xc_ids = {rec.xc_id for rec in existing_target_recordings}
+                new_xc_ids = [xc_id for xc_id in xc_ids if xc_id not in existing_xc_ids]
+
+                total_existing = len(existing_target_recordings)
+
+                while total_existing < num_targets:
+                    for xc_id in new_xc_ids:
+                        if total_existing >= num_targets:
+                            break
+                        self.download_target_recording(xc_id, call, species)
+                        total_existing += 1
+                    if total_existing < num_targets:
+                        print(f"Ran out of xc_ids for {species}: {call}.")
+                        break
