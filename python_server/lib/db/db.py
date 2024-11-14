@@ -1,6 +1,12 @@
-from sqlmodel import SQLModel, create_engine, Session, select
+from sqlmodel import SQLModel, create_engine, Session, not_, select, col
 from typing import Optional, Sequence
-from python_server.lib.models import FinishedTargetRecording, Project, TargetRecording, User
+from python_server.lib.models import (
+    FinishedTargetRecording,
+    PossibleExample,
+    Project,
+    TargetRecording,
+    User,
+)
 
 
 class AccountsDB:
@@ -50,22 +56,23 @@ class AccountsDB:
             project_id: ID of the project.
         """
         with Session(self.engine) as session:
-            statement = select(TargetRecording)
+            subquery = (
+                select(FinishedTargetRecording.target_recording_id)
+                .where(FinishedTargetRecording.project_id == project_id)
+                .subquery()
+            )
 
-            if project_id is not None:
-                statement.outerjoin(
-                    FinishedTargetRecording,
-                ).where(
-                    FinishedTargetRecording.project_id == project_id
-                ).where(FinishedTargetRecording.target_recording_id == TargetRecording.id)
+            statement = select(TargetRecording).where(
+                not_(col(TargetRecording.id).in_(select(subquery.c.target_recording_id)))
+            )
 
-            if species_code is not None:
-                statement = statement.where(TargetRecording.species == species_code)
-            if call_type is not None:
-                statement = statement.where(TargetRecording.call_type == call_type)
+        if species_code is not None:
+            statement = statement.where(TargetRecording.species == species_code)
+        if call_type is not None:
+            statement = statement.where(TargetRecording.call_type == call_type)
 
-            target_recordings = session.exec(statement).all()
-            return target_recordings
+        target_recordings = session.exec(statement).all()
+        return target_recordings
 
     def add_target_recording(self, target_recording: TargetRecording):
         """
@@ -97,7 +104,7 @@ class AccountsDB:
             target_recording = session.exec(statement).first()
             return target_recording
 
-    def finish_target_recording(self, target_recording_id: int) -> None:
+    def finish_target_recording(self, target_recording_id: int, project_id: int) -> None:
         """
         Finish the target recording with the given id.
 
@@ -105,10 +112,43 @@ class AccountsDB:
 
         Args:
             target_recording_id: The id of the target recording to finish.
+            project_id: The id of the project that the target recording is being used for.
         """
         with Session(self.engine) as session:
             finished_target_recording = FinishedTargetRecording(
-                target_recording_id=target_recording_id
+                target_recording_id=target_recording_id, project_id=project_id
             )
             session.add(finished_target_recording)
             session.commit()
+
+    def get_finished_targets(self, project_id: int) -> Sequence[FinishedTargetRecording]:
+        """
+        Get the list of finished target recordings for the given project.
+
+        Args:
+            project_id: The id of the project to get the finished target recordings for.
+
+        Returns:
+            The list of finished target recordings for the given project.
+        """
+        with Session(self.engine) as session:
+            statement = select(FinishedTargetRecording).where(
+                FinishedTargetRecording.project_id == project_id
+            )
+            finished_targets = session.exec(statement).all()
+            return finished_targets
+
+    def add_possible_example(self, possible_example: PossibleExample):
+        """
+        Adds a possible example to the database.
+
+        Args:
+            possible_example: The possible example to add to the database.
+
+        Returns:
+            The id of the possible example
+        """
+        with Session(self.engine) as session:
+            session.add(possible_example)
+            session.commit()
+            return possible_example.id

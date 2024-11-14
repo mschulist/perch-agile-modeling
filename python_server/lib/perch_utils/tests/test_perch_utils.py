@@ -42,3 +42,15 @@ def test_process_req_for_targets():
     existing_targets = db.get_target_recordings(species_code=None, call_type=None, project_id=1)
 
     assert len(existing_targets) == 4
+
+    # finish a target recording and make sure that it gets removed from the list of target recordings
+    existing_id = existing_targets[0].id
+    assert existing_id is not None
+    db.finish_target_recording(existing_id, 1)
+
+    existing_targets = db.get_target_recordings(species_code=None, call_type=None, project_id=1)
+
+    finished = db.get_finished_targets(1)
+    assert len(finished) == 1
+
+    assert len(existing_targets) == 3

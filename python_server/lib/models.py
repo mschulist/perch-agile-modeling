@@ -107,6 +107,7 @@ class PossibleExample(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     filename: str = Field(index=True)
     timestamp_s: float = Field(index=True)
+    score: float = Field(index=True)
 
     target_recording_id: Optional[int] = Field(default=None, foreign_key="target_recordings.id")
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")

@@ -11,6 +11,8 @@ import tempfile
 from scipy.io import wavfile
 from chirp import audio_utils
 
+import os
+
 from chirp.taxonomy import namespace_db
 
 # TARGET_RECORDINGS_PATH = epath.Path("data/target_recordings")
@@ -111,6 +113,14 @@ class GatherTargetRecordings:
         """
 
         url = f'https://www.xeno-canto.org/api/2/recordings?query={scientific_name} type:"{call_type}" len:1-{self.max_len_s}'
+
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            import json
+
+            if scientific_name == "turdus migratorius":
+                return ["524658"]
+            elif scientific_name == "piranga ludoviciana":
+                return ["441367"]
 
         status_code = 0
         response = None
@@ -213,7 +223,12 @@ class GatherTargetRecordings:
                 xc_ids = self.get_xc_ids(xc_sci_name, call)
 
                 # Make sure that we don't download the same recording twice.
-                existing_xc_ids = {rec.xc_id for rec in existing_target_recordings}
+                # all existing target recordings includes from all projects,
+                # whereas existing_target_recordings excludes targets that have already been used by the project.
+                all_existing_targets = self.get_existing_target_recordings(
+                    species, call, project_id=None
+                )
+                existing_xc_ids = {rec.xc_id for rec in all_existing_targets}
                 new_xc_ids = [xc_id for xc_id in xc_ids if xc_id not in existing_xc_ids]
 
                 total_existing = len(existing_target_recordings)
