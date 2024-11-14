@@ -6,6 +6,7 @@ from python_server.lib.models import (
     Project,
     TargetRecording,
     User,
+    FinishedPossibleExample,
 )
 
 
@@ -167,3 +168,44 @@ class AccountsDB:
             statement = select(PossibleExample).where(PossibleExample.project_id == project_id)
             possible_examples = session.exec(statement).all()
             return possible_examples
+
+    def get_next_possible_example(self, project_id) -> Optional[PossibleExample]:
+        """
+        Get the "next" possible example to annotate.
+
+        This is just a "random" possible example that has not been annotated yet,
+        meaning that it is not present in the finished_possible_examples table.
+
+        Args:
+            project_id: The id of the project to get the next possible example for.
+
+        Returns:
+            The next possible example to annotate.
+        """
+        with Session(self.engine) as session:
+            subquery = (
+                select(FinishedPossibleExample.possible_example_id)
+                .where(FinishedPossibleExample.project_id == project_id)
+                .subquery()
+            )
+
+            statement = select(PossibleExample).where(
+                not_(col(PossibleExample.id).in_(select(subquery.c.possible_example_id)))
+            )
+
+            possible_example = session.exec(statement).first()
+            return possible_example
+
+    def finish_possible_example(self, possible_example: PossibleExample):
+        """
+        Adds the possible example to the finished_possible_examples table.
+
+        Args:
+            possible_example: The possible example to finish.
+        """
+        with Session(self.engine) as session:
+            finished_possible_example = FinishedPossibleExample(
+                possible_example_id=possible_example.id, project_id=possible_example.project_id
+            )
+            session.add(finished_possible_example)
+            session.commit()

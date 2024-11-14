@@ -44,7 +44,7 @@ class Project(SQLModel, table=True):
     finished_target_recordings: List["FinishedTargetRecording"] = Relationship(
         back_populates="project"
     )
-    finished_possible_examples: List["FinishedPossibleExamples"] = Relationship(
+    finished_possible_examples: List["FinishedPossibleExample"] = Relationship(
         back_populates="project"
     )
     possible_examples: List["PossibleExample"] = Relationship(back_populates="project")
@@ -116,12 +116,12 @@ class PossibleExample(SQLModel, table=True):
     target_recording: Optional[TargetRecording] = Relationship(back_populates="possible_examples")
     project: Optional[Project] = Relationship(back_populates="possible_examples")
 
-    finished_possible_examples: List["FinishedPossibleExamples"] = Relationship(
+    finished_possible_examples: List["FinishedPossibleExample"] = Relationship(
         back_populates="possible_example"
     )
 
 
-class FinishedPossibleExamples(SQLModel, table=True):
+class FinishedPossibleExample(SQLModel, table=True):
     """
     Table to store all of the possible examples that have already been labeled by humans.
     """
