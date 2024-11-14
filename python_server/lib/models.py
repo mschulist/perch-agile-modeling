@@ -108,6 +108,7 @@ class PossibleExample(SQLModel, table=True):
     filename: str = Field(index=True)
     timestamp_s: float = Field(index=True)
     score: float = Field(index=True)
+    embedding_id: int = Field(index=True)
 
     target_recording_id: Optional[int] = Field(default=None, foreign_key="target_recordings.id")
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")

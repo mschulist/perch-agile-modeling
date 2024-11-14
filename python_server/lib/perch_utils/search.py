@@ -1,9 +1,9 @@
-from pyexpat import model
 import tempfile
 from typing import List, Sequence
 from scipy.io import wavfile
 
-from numpy import isin
+from ml_collections import config_dict
+
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 from chirp.projects.hoplite import interface, score_functions, brutalism, search_results
@@ -52,13 +52,22 @@ class GatherPossibleExamples:
 
         # set up the embedding model for the hoplite db
         perch_model_config = hoplite_db.get_metadata("model_config")
+        print("PERCH MODEL CONFIG", perch_model_config)
+        # TODO: fix this crappy config
+        if not isinstance(perch_model_config, config_dict.ConfigDict):
+            raise ValueError("Model config must be a ConfigDict.")
         model_key = perch_model_config.model_key
         if not isinstance(model_key, str):
             raise ValueError("Model key must be a string.")
         model_class = model_configs.MODEL_CLASS_MAP[model_key]
-        self.embedding_model = model_class.from_config(perch_model_config)
+        model_config = perch_model_config.model_config
+        if not isinstance(model_config, config_dict.ConfigDict):
+            raise ValueError("Inner nested model config must be a ConfigDict.")
+        self.embedding_model = model_class.from_config(model_config)
 
         self.sample_rate = self.embedding_model.sample_rate
+
+        self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0]["base_path"]  # type: ignore
 
     def get_possible_examples(
         self,
@@ -156,6 +165,7 @@ class GatherPossibleExamples:
             filename=source.source_id,
             target_recording_id=target_recording.id,
             target_recording=target_recording,
+            embedding_id=search_result.embedding_id,
         )
 
         possible_example_id = self.db.add_possible_example(possible_example)
@@ -168,7 +178,7 @@ class GatherPossibleExamples:
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
-            source.source_id,
+            f"{self.base_path}/{source.source_id}",
             offset_s=source.offsets[0],
             window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
             sample_rate=self.sample_rate,

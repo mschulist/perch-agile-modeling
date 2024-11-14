@@ -152,3 +152,18 @@ class AccountsDB:
             session.add(possible_example)
             session.commit()
             return possible_example.id
+
+    def get_possible_examples(self, project_id: int) -> Sequence[PossibleExample]:
+        """
+        Get the list of possible examples for the given project.
+
+        Args:
+            project_id: The id of the project to get the possible examples for.
+
+        Returns:
+            The list of possible examples for the given project.
+        """
+        with Session(self.engine) as session:
+            statement = select(PossibleExample).where(PossibleExample.project_id == project_id)
+            possible_examples = session.exec(statement).all()
+            return possible_examples
