@@ -3,12 +3,17 @@ from typing import List, Sequence
 from scipy.io import wavfile
 
 from ml_collections import config_dict
+from librosa import display as librosa_display
+import matplotlib.pyplot as plt
 
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 from chirp.projects.hoplite import interface, score_functions, brutalism, search_results
 from chirp.projects.zoo import model_configs
+from chirp.projects.agile2 import embedding_display
 from chirp import audio_utils
+
+
 from python_server.lib.models import PossibleExample, TargetRecording
 from python_server.lib.perch_utils.target_recordings import (
     GatherTargetRecordings,
@@ -157,7 +162,10 @@ class GatherPossibleExamples:
             target_recording: Target recording that the search result is associated with.
         """
         # insert into database
-        source = self.hoplite_db.get_embedding_source(search_result.embedding_id)
+        # TODO: figure out why the embedding id is returned as bytes, even through the interface
+        # claims that it is an int
+        embed_id = int.from_bytes(search_result.embedding_id, "little")  # type: ignore
+        source = self.hoplite_db.get_embedding_source(embed_id)
         possible_example = PossibleExample(
             project_id=self.project_id,
             score=score,
@@ -165,7 +173,7 @@ class GatherPossibleExamples:
             filename=source.source_id,
             target_recording_id=target_recording.id,
             target_recording=target_recording,
-            embedding_id=search_result.embedding_id,
+            embedding_id=embed_id,
         )
 
         possible_example_id = self.db.add_possible_example(possible_example)
@@ -173,17 +181,54 @@ class GatherPossibleExamples:
         if possible_example_id is None:
             raise ValueError("Failed to add possible example to the database.")
 
-        output_filepath = get_possible_example_audio_path(
+        # save the audio and image results
+        self.flush_search_result_to_disk(source, possible_example_id)
+
+    def flush_search_result_to_disk(
+        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
+    ):
+        """
+        Save the audio and image results to the precompute search directory.
+
+        Args:
+            embedding_source: Embedding source to save.
+            possible_example_id: Id of the possible example.
+        """
+        # First, load the audio and save it to the precompute search directory
+        audio_output_filepath = get_possible_example_audio_path(
             possible_example_id, self.precompute_search_dir
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
-            f"{self.base_path}/{source.source_id}",
-            offset_s=source.offsets[0],
+            f"{self.base_path}/{embedding_source.source_id}",
+            offset_s=embedding_source.offsets[0],
             window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
             sample_rate=self.sample_rate,
         )
 
         with tempfile.NamedTemporaryFile() as tmp_file:
             wavfile.write(tmp_file.name, self.sample_rate, np.float32(audio_slice))
-            epath.Path(tmp_file.name).copy(output_filepath)
+            epath.Path(tmp_file.name).copy(audio_output_filepath)
+
+        # Second, get the spectrogram and save it to the precompute search directory
+        image_output_filepath = get_possible_example_image_path(
+            possible_example_id, self.precompute_search_dir
+        )
+
+        melspec_layer = embedding_display.get_melspec_layer(self.sample_rate)
+        if audio_slice.shape[0] < self.sample_rate / 100 + 1:
+            # Center pad if audio is too short.
+            zs = np.zeros([self.sample_rate // 10], dtype=audio_slice.dtype)
+            audio_slice = np.concatenate([zs, audio_slice, zs], axis=0)
+        melspec = melspec_layer(audio_slice).T  # type: ignore
+
+        librosa_display.specshow(
+            melspec,
+            sr=self.sample_rate,
+            y_axis="mel",
+            x_axis="time",
+            hop_length=self.sample_rate // 100,
+            cmap="Greys",
+        )
+        plt.savefig(image_output_filepath)
+        plt.close()

@@ -6,6 +6,9 @@ from python_server.lib.perch_utils import GatherPossibleExamples
 import tempfile
 from chirp.projects.agile2 import embed, source_info, colab_utils
 from chirp.projects.agile2.tests import test_utils
+from etils import epath
+
+from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
 
 # create a fake db
 tmp_db = tempfile.NamedTemporaryFile(suffix=".db")
@@ -104,12 +107,12 @@ worker.process_all(target_dataset_name="test")
 
 print("DONE EMBEDDING")
 
+precompute_dir = tempfile.TemporaryDirectory()
+
 
 def test_search_hoplite_db():
     species_codes = ["amerob", "westan"]
     call_types = ["song", "call"]
-
-    precompute_dir = tempfile.TemporaryDirectory()
 
     gatherer = GatherPossibleExamples(
         db=db,
@@ -133,3 +136,34 @@ def test_search_hoplite_db():
         assert example.embedding_id is not None
 
     print(possible_examples)
+
+
+# this path is just so that we can see the images and audio files that were created
+tmp_annotation_path = epath.Path("test_annotations/")
+tmp_annotation_path.mkdir(exist_ok=True, parents=True)
+
+
+def test_annotate():
+    annotate = AnnotatePossibleExamples(
+        db=db,
+        hoplite_db=hoplite_db,
+        precompute_search_dir=precompute_dir.name,
+        project_id=1,
+    )
+
+    error = None
+    num_examples = 0
+    while error is None:
+        ex = annotate.get_next_possible_example()
+        if ex is None:
+            break
+        annotate.annotate_possible_example(ex, "westan", "test_user")
+        num_examples += 1
+        image_path = annotate.get_possible_example_image_path(ex)
+        audio_path = annotate.get_possible_example_audio_path(ex)
+        assert image_path.exists()
+        assert audio_path.exists()
+        image_path.copy(tmp_annotation_path / image_path.name)
+        audio_path.copy(tmp_annotation_path / audio_path.name)
+
+    assert num_examples == 4

@@ -1,9 +1,14 @@
+from typing import Optional
 from python_server.lib.db.db import AccountsDB
 from chirp.projects.hoplite import interface
 
 from etils import epath
 
 from python_server.lib.models import PossibleExample
+from python_server.lib.perch_utils.search import (
+    get_possible_example_audio_path,
+    get_possible_example_image_path,
+)
 
 
 class AnnotatePossibleExamples:
@@ -19,16 +24,11 @@ class AnnotatePossibleExamples:
         self.precompute_search_dir = epath.Path(precompute_search_dir)
         self.project_id = project_id
 
-    def get_next_possible_example(self) -> PossibleExample:
+    def get_next_possible_example(self) -> Optional[PossibleExample]:
         """
         Get the next possible example to annotate.
         """
-        next_possible_example = self.db.get_next_possible_example(project_id=self.project_id)
-
-        if next_possible_example is None:
-            raise ValueError("No more possible examples to annotate.")
-
-        return next_possible_example
+        return self.db.get_next_possible_example(project_id=self.project_id)
 
     def finish_possible_example(self, possible_example: PossibleExample):
         """
@@ -57,3 +57,19 @@ class AnnotatePossibleExamples:
             provenance=provenance,
         )
         self.hoplite_db.insert_label(label)
+
+    def get_possible_example_image_path(self, possible_example: PossibleExample) -> epath.Path:
+        """
+        Get the path to the image of the possible example.
+        """
+        if possible_example.id is None:
+            raise ValueError("Possible example must have an id.")
+        return get_possible_example_image_path(possible_example.id, self.precompute_search_dir)
+
+    def get_possible_example_audio_path(self, possible_example: PossibleExample) -> epath.Path:
+        """
+        Get the path to the audio of the possible example.
+        """
+        if possible_example.id is None:
+            raise ValueError("Possible example must have an id.")
+        return get_possible_example_audio_path(possible_example.id, self.precompute_search_dir)
