@@ -145,3 +145,13 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: str
+
+
+class PossibleExampleResponse(BaseModel):
+    filename: str
+    timestamp_s: float
+    score: float
+    image_path: str
+    audio_path: str
+    target_species: str
+    target_call_type: str

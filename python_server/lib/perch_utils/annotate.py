@@ -4,7 +4,7 @@ from chirp.projects.hoplite import interface
 
 from etils import epath
 
-from python_server.lib.models import PossibleExample
+from python_server.lib.models import PossibleExample, PossibleExampleResponse
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
     get_possible_example_image_path,
@@ -73,3 +73,29 @@ class AnnotatePossibleExamples:
         if possible_example.id is None:
             raise ValueError("Possible example must have an id.")
         return get_possible_example_audio_path(possible_example.id, self.precompute_search_dir)
+
+    def get_next_possible_example_with_data(self) -> Optional[PossibleExampleResponse]:
+        """
+        Get the next possible example to annotate with the audio and image paths.
+
+        Meant to be used by the api to get the response for the next possible example.
+        """
+        possible_example = self.get_next_possible_example()
+        if possible_example is None or possible_example.target_recording_id is None:
+            return None
+        image_path = self.get_possible_example_image_path(possible_example)
+        audio_path = self.get_possible_example_audio_path(possible_example)
+
+        target_recording = self.db.get_target_recording(possible_example.target_recording_id)
+        if target_recording is None:
+            raise ValueError("Target recording not found for possible example.")
+
+        return PossibleExampleResponse(
+            filename=possible_example.filename,
+            timestamp_s=possible_example.timestamp_s,
+            score=possible_example.score,
+            image_path=str(image_path),
+            audio_path=str(audio_path),
+            target_species=target_recording.species,
+            target_call_type=target_recording.call_type,
+        )
