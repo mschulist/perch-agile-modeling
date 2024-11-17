@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
+from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.search import GatherPossibleExamples
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
@@ -18,7 +19,13 @@ from .lib.auth import (
     get_db,
     hash_password,
 )
-from .lib.models import Project, Token, User
+from .lib.models import (
+    AnnotatedRecording,
+    PossibleExampleResponse,
+    Project,
+    Token,
+    User,
+)
 from .lib.db import AccountsDB
 import dotenv
 
@@ -137,7 +144,7 @@ async def create_project_db_legacy(
     return {"success": success}
 
 
-@app.post("/get_next_possible_example")
+@app.post("/get_next_possible_example", response_model=PossibleExampleResponse)
 async def get_next_possible_example(
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: int,
@@ -204,3 +211,116 @@ async def gather_possible_examples(
         species_codes, call_types, num_examples_per_target, num_targets
     )
     return {"message": "Started to gather target recordings", "success": True}
+
+
+@app.post("/annotate_example")
+async def annotate_example(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    embedding_id: int,
+    labels: List[str],
+):
+    """
+    Given a user and project (that they are a part of), annotate an example with the given labels.
+    """
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = load_hoplite_db(project_id)
+
+    annotate = AnnotatePossibleExamples(
+        db=db,
+        hoplite_db=hoplite_db,
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+        project_id=project_id,
+    )
+    annotate.annotate_possible_example_by_embedding_id(
+        embedding_id, labels, current_user.name
+    )
+    return {"message": "Annotated example", "success": True}
+
+
+@app.get("/get_label_summary")
+async def get_label_summary(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = load_hoplite_db(project_id)
+
+    explore = ExploreAnnotations(
+        db=db,
+        hoplite_db=hoplite_db,  # type: ignore
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+        project_id=project_id,
+        provenance=current_user.name,
+    )
+    label_summary = explore.get_annotations_summary()
+    return label_summary
+
+
+@app.get("/get_annotations_by_label", response_model=List[AnnotatedRecording])
+async def get_annotations_by_label(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    label: str,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = load_hoplite_db(project_id)
+
+    explore = ExploreAnnotations(
+        db=db,
+        hoplite_db=hoplite_db,  # type: ignore
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+        project_id=project_id,
+        provenance=current_user.name,
+    )
+    annotations = explore.get_annotations_by_label(label)
+    return annotations
+
+
+@app.post("/relabel_example")
+async def relabel_example(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    embedding_id: int,
+    labels: List[str],
+):
+    """
+    Given a user and project (that they are a part of), relabel an example with the given labels.
+    """
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = load_hoplite_db(project_id)
+
+    explore = ExploreAnnotations(
+        db=db,
+        hoplite_db=hoplite_db,  # type: ignore
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+        project_id=project_id,
+        provenance=current_user.name,
+    )
+
+    explore.change_annotation(embedding_id, labels)
+    return {"message": "Relabeled example", "success": True}

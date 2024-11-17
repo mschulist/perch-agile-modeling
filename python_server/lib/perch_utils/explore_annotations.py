@@ -154,3 +154,5 @@ class ExploreAnnotations:
                 provenance=self.provenance,
             )
             self.hoplite_db.insert_label(label)
+
+        self.hoplite_db.commit()

@@ -237,7 +237,7 @@ class AccountsDB:
 
         with Session(self.engine) as session:
             statement = select(PossibleExample).where(
-                PossibleExample.embedding_id == embedding_id
+                PossibleExample.embedding_id == int(embedding_id)
             )
             possible_example = session.exec(statement).first()
             return possible_example

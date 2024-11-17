@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from python_server.lib.db.db import AccountsDB
 from chirp.projects.hoplite import interface
 
@@ -37,7 +37,11 @@ class AnnotatePossibleExamples:
         self.db.finish_possible_example(possible_example)
 
     def annotate_possible_example(
-        self, possible_example: PossibleExample, annotation: str, provenance: str
+        self,
+        possible_example: PossibleExample,
+        annotation: str,
+        provenance: str,
+        finish: bool = True,
     ):
         """
         Annotate the possible example. "Finishes" the possible example and
@@ -48,15 +52,50 @@ class AnnotatePossibleExamples:
             annotation: The label for the possible example. This does not necessarily need
                 to match the label of the possible example.
             provenance: The provenance of the label. Name of the person who labeled the example.
+            finish: If True, the possible example will be finished and not shown again.
         """
-        self.finish_possible_example(possible_example)
         label = interface.Label(
             embedding_id=possible_example.embedding_id,
             label=annotation,
             type=interface.LabelType.POSITIVE,
             provenance=provenance,
         )
-        self.hoplite_db.insert_label(label)
+        succ = self.hoplite_db.insert_label(label)
+        if not succ:
+            raise ValueError("Could not insert label.")
+        if finish:
+            self.finish_possible_example(possible_example)
+
+    def annotate_possible_example_by_embedding_id(
+        self,
+        embedding_id: int,
+        annotations: List[str],
+        provenance: str,
+    ):
+        """
+        Annotate the possible example by the embedding id
+
+        The frontend does not have access to the entire PossibleExample object,
+        so this method will assist in that case.
+
+        We can also label a single embedding id with multiple labels if needed.
+
+        Args:
+            embedding_id: The embedding id to annotate.
+            annotations: The list of labels for the embedding id.
+            provenance: The provenance of the label. Name of the person who labeled the example.
+        """
+        possible_example = self.db.get_possible_example_by_embed_id(embedding_id)
+        if possible_example is None:
+            raise ValueError("Possible example not found for embedding id.")
+        if len(annotations) == 0:
+            raise ValueError("Need at least one annotation.")
+        for annotation in annotations:
+            self.annotate_possible_example(
+                possible_example, annotation, provenance, finish=False
+            )
+        self.hoplite_db.commit()
+        self.finish_possible_example(possible_example)
 
     def get_possible_example_image_path(
         self, possible_example: PossibleExample
