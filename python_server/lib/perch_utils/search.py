@@ -1,14 +1,20 @@
-from pyexpat import model
 import tempfile
 from typing import List, Sequence
 from scipy.io import wavfile
 
-from numpy import isin
+from ml_collections import config_dict
+from librosa import display as librosa_display
+import matplotlib.pyplot as plt
+
+from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 from chirp.projects.hoplite import interface, score_functions, brutalism, search_results
 from chirp.projects.zoo import model_configs
+from chirp.projects.agile2 import embedding_display
 from chirp import audio_utils
+
+
 from python_server.lib.models import PossibleExample, TargetRecording
 from python_server.lib.perch_utils.target_recordings import (
     GatherTargetRecordings,
@@ -19,19 +25,23 @@ import numpy as np
 
 def get_possible_example_image_path(
     possible_example_id: int, precompute_search_dir: epath.Path
-) -> epath.Path:
+) -> epath.Path | str:
     """
     Get the path to the image for the possible example with the given id.
     """
+    if str(precompute_search_dir).startswith("gs://"):
+        return get_temp_gs_url(f"{str(precompute_search_dir)}/{possible_example_id}.png")
     return precompute_search_dir / f"{possible_example_id}.png"
 
 
 def get_possible_example_audio_path(
     possible_example_id: int, precompute_search_dir: epath.Path
-) -> epath.Path:
+) -> epath.Path | str:
     """
     Get the path to the audio for the possible example with the given id.
     """
+    if str(precompute_search_dir).startswith("gs://"):
+        return get_temp_gs_url(f"{str(precompute_search_dir)}/{possible_example_id}.wav")
     return precompute_search_dir / f"{possible_example_id}.wav"
 
 
@@ -52,13 +62,22 @@ class GatherPossibleExamples:
 
         # set up the embedding model for the hoplite db
         perch_model_config = hoplite_db.get_metadata("model_config")
+        print("PERCH MODEL CONFIG", perch_model_config)
+        # TODO: fix this crappy config
+        if not isinstance(perch_model_config, config_dict.ConfigDict):
+            raise ValueError("Model config must be a ConfigDict.")
         model_key = perch_model_config.model_key
         if not isinstance(model_key, str):
             raise ValueError("Model key must be a string.")
         model_class = model_configs.MODEL_CLASS_MAP[model_key]
-        self.embedding_model = model_class.from_config(perch_model_config)
+        model_config = perch_model_config.model_config
+        if not isinstance(model_config, config_dict.ConfigDict):
+            raise ValueError("Inner nested model config must be a ConfigDict.")
+        self.embedding_model = model_class.from_config(model_config)
 
         self.sample_rate = self.embedding_model.sample_rate
+
+        self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0]["base_path"]  # type: ignore
 
     def get_possible_examples(
         self,
@@ -148,7 +167,10 @@ class GatherPossibleExamples:
             target_recording: Target recording that the search result is associated with.
         """
         # insert into database
-        source = self.hoplite_db.get_embedding_source(search_result.embedding_id)
+        # TODO: figure out why the embedding id is returned as bytes, even through the interface
+        # claims that it is an int
+        embed_id = int.from_bytes(search_result.embedding_id, "little")  # type: ignore
+        source = self.hoplite_db.get_embedding_source(embed_id)
         possible_example = PossibleExample(
             project_id=self.project_id,
             score=score,
@@ -156,6 +178,7 @@ class GatherPossibleExamples:
             filename=source.source_id,
             target_recording_id=target_recording.id,
             target_recording=target_recording,
+            embedding_id=embed_id,
         )
 
         possible_example_id = self.db.add_possible_example(possible_example)
@@ -163,17 +186,54 @@ class GatherPossibleExamples:
         if possible_example_id is None:
             raise ValueError("Failed to add possible example to the database.")
 
-        output_filepath = get_possible_example_audio_path(
+        # save the audio and image results
+        self.flush_search_result_to_disk(source, possible_example_id)
+
+    def flush_search_result_to_disk(
+        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
+    ):
+        """
+        Save the audio and image results to the precompute search directory.
+
+        Args:
+            embedding_source: Embedding source to save.
+            possible_example_id: Id of the possible example.
+        """
+        # First, load the audio and save it to the precompute search directory
+        audio_output_filepath = get_possible_example_audio_path(
             possible_example_id, self.precompute_search_dir
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
-            source.source_id,
-            offset_s=source.offsets[0],
+            f"{self.base_path}/{embedding_source.source_id}",
+            offset_s=embedding_source.offsets[0],
             window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
             sample_rate=self.sample_rate,
         )
 
         with tempfile.NamedTemporaryFile() as tmp_file:
             wavfile.write(tmp_file.name, self.sample_rate, np.float32(audio_slice))
-            epath.Path(tmp_file.name).copy(output_filepath)
+            epath.Path(tmp_file.name).copy(audio_output_filepath)
+
+        # Second, get the spectrogram and save it to the precompute search directory
+        image_output_filepath = get_possible_example_image_path(
+            possible_example_id, self.precompute_search_dir
+        )
+
+        melspec_layer = embedding_display.get_melspec_layer(self.sample_rate)
+        if audio_slice.shape[0] < self.sample_rate / 100 + 1:
+            # Center pad if audio is too short.
+            zs = np.zeros([self.sample_rate // 10], dtype=audio_slice.dtype)
+            audio_slice = np.concatenate([zs, audio_slice, zs], axis=0)
+        melspec = melspec_layer(audio_slice).T  # type: ignore
+
+        librosa_display.specshow(
+            melspec,
+            sr=self.sample_rate,
+            y_axis="mel",
+            x_axis="time",
+            hop_length=self.sample_rate // 100,
+            cmap="Greys",
+        )
+        plt.savefig(image_output_filepath)
+        plt.close()

@@ -6,6 +6,7 @@ from python_server.lib.models import (
     Project,
     TargetRecording,
     User,
+    FinishedPossibleExample,
 )
 
 
@@ -152,3 +153,69 @@ class AccountsDB:
             session.add(possible_example)
             session.commit()
             return possible_example.id
+
+    def get_possible_examples(self, project_id: int) -> Sequence[PossibleExample]:
+        """
+        Get the list of possible examples for the given project.
+
+        Args:
+            project_id: The id of the project to get the possible examples for.
+
+        Returns:
+            The list of possible examples for the given project.
+        """
+        with Session(self.engine) as session:
+            statement = select(PossibleExample).where(PossibleExample.project_id == project_id)
+            possible_examples = session.exec(statement).all()
+            return possible_examples
+
+    def get_next_possible_example(self, project_id) -> Optional[PossibleExample]:
+        """
+        Get the "next" possible example to annotate.
+
+        This is just a "random" possible example that has not been annotated yet,
+        meaning that it is not present in the finished_possible_examples table.
+
+        Args:
+            project_id: The id of the project to get the next possible example for.
+
+        Returns:
+            The next possible example to annotate.
+        """
+        with Session(self.engine) as session:
+            subquery = (
+                select(FinishedPossibleExample.possible_example_id)
+                .where(FinishedPossibleExample.project_id == project_id)
+                .subquery()
+            )
+
+            statement = select(PossibleExample).where(
+                not_(col(PossibleExample.id).in_(select(subquery.c.possible_example_id)))
+            )
+
+            possible_example = session.exec(statement).first()
+            return possible_example
+
+    def finish_possible_example(self, possible_example: PossibleExample):
+        """
+        Adds the possible example to the finished_possible_examples table.
+
+        Args:
+            possible_example: The possible example to finish.
+        """
+        with Session(self.engine) as session:
+            finished_possible_example = FinishedPossibleExample(
+                possible_example_id=possible_example.id, project_id=possible_example.project_id
+            )
+            session.add(finished_possible_example)
+            session.commit()
+
+    def get_possible_example_by_embed_id(self, embedding_id: int) -> Optional[PossibleExample]:
+        """
+        Given an embedding id from the hoplite db, get the possible example from the perch db.
+        """
+
+        with Session(self.engine) as session:
+            statement = select(PossibleExample).where(PossibleExample.embedding_id == embedding_id)
+            possible_example = session.exec(statement).first()
+            return possible_example

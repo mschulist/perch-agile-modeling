@@ -1,11 +1,15 @@
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, List
 from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
+
+from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
+from python_server.lib.perch_utils.search import GatherPossibleExamples
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
 
-from .lib.perch_utils.projects import setup_perch_db
+from .lib.perch_utils.projects import load_hoplite_db, setup_hoplite_db
 
 from .lib.auth import (
     authenticate_user,
@@ -21,6 +25,9 @@ import dotenv
 dotenv.load_dotenv()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+PRECOMPUTE_SEARCH_DIR = "data/precompute_search"
+TARGET_EXAMPLES_DIR = "data/target_examples"
 
 
 app = FastAPI()
@@ -94,7 +101,7 @@ async def create_project_db(
     if project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    success = setup_perch_db(project_id, dataset_base_path, dataset_fileglob, model_choice)
+    success = setup_hoplite_db(project_id, dataset_base_path, dataset_fileglob, model_choice)
 
     if not success:
         raise HTTPException(status_code=400, detail="DB already exists")
@@ -122,3 +129,68 @@ async def create_project_db_legacy(
     if not success:
         raise HTTPException(status_code=400, detail="DB already exists")
     return {"success": success}
+
+
+@app.post("/get_next_possible_example")
+async def get_next_possible_example(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+):
+    """
+    Given a user and project (that they are a part of), get the next possible example to annotate.
+
+    We will return the {audio, image, possible_label, score, filename, timestamp_s} of the next possible example.
+    """
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id] + [c.id for c in project.contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = load_hoplite_db(project_id)
+    annotate = AnnotatePossibleExamples(
+        db=db,
+        hoplite_db=hoplite_db,
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+        project_id=project_id,
+    )
+    possible_example_response = annotate.get_next_possible_example_with_data()
+    if not possible_example_response:
+        return {"message": "No more possible examples"}
+    return possible_example_response
+
+
+@app.get("/get_file")
+async def get_file(filename: str):
+    # TODO: Check if the file is in the precompute search dir
+    # for security reasons
+    return FileResponse(filename)
+
+
+@app.post("/gather_possible_examples")
+async def gather_possible_examples(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    species_codes: List[str],
+    call_types: List[str],
+    num_examples_per_target: int,
+    num_targets: int,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id] + [c.id for c in project.contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = load_hoplite_db(project_id)
+    gatherer = GatherPossibleExamples(
+        db=db,
+        hoplite_db=hoplite_db,
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+        target_path=TARGET_EXAMPLES_DIR,
+        project_id=project_id,
+    )
+    gatherer.get_possible_examples(species_codes, call_types, num_examples_per_target, num_targets)
+    return {"message": "Started to gather target recordings", "success": True}

@@ -115,12 +115,11 @@ class GatherTargetRecordings:
         url = f'https://www.xeno-canto.org/api/2/recordings?query={scientific_name} type:"{call_type}" len:1-{self.max_len_s}'
 
         if "PYTEST_CURRENT_TEST" in os.environ:
-            import json
 
             if scientific_name == "turdus migratorius":
-                return ["524658"]
+                return ["168640", "364119"]
             elif scientific_name == "piranga ludoviciana":
-                return ["441367"]
+                return ["1252", "324863"]
 
         status_code = 0
         response = None

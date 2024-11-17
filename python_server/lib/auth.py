@@ -11,6 +11,9 @@ from .db import AccountsDB
 from dotenv import load_dotenv
 import os
 
+from google.cloud import storage
+from etils import epath
+
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY") or "test"
@@ -79,3 +82,17 @@ def authenticate_user(db: AccountsDB, email: str, password: str) -> User | None:
     if not verify_password(password, user.hashed_password):
         return None
     return user
+
+
+def get_temp_gs_url(filepath: str) -> str:
+    """
+    Given a filepath beginning with gs://, return a temporary signed URL.
+    """
+    if not filepath.startswith("gs://"):
+        raise ValueError("Filepath must begin with gs://")
+
+    storage_client = storage.Client()
+    bucket_name = filepath.split("/")[2]
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob("/".join(filepath.split("/")[3:]))
+    return blob.generate_signed_url(expiration=timedelta(days=1), method="GET")

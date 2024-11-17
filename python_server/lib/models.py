@@ -44,7 +44,7 @@ class Project(SQLModel, table=True):
     finished_target_recordings: List["FinishedTargetRecording"] = Relationship(
         back_populates="project"
     )
-    finished_possible_examples: List["FinishedPossibleExamples"] = Relationship(
+    finished_possible_examples: List["FinishedPossibleExample"] = Relationship(
         back_populates="project"
     )
     possible_examples: List["PossibleExample"] = Relationship(back_populates="project")
@@ -108,6 +108,7 @@ class PossibleExample(SQLModel, table=True):
     filename: str = Field(index=True)
     timestamp_s: float = Field(index=True)
     score: float = Field(index=True)
+    embedding_id: int = Field(index=True)
 
     target_recording_id: Optional[int] = Field(default=None, foreign_key="target_recordings.id")
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
@@ -115,12 +116,12 @@ class PossibleExample(SQLModel, table=True):
     target_recording: Optional[TargetRecording] = Relationship(back_populates="possible_examples")
     project: Optional[Project] = Relationship(back_populates="possible_examples")
 
-    finished_possible_examples: List["FinishedPossibleExamples"] = Relationship(
+    finished_possible_examples: List["FinishedPossibleExample"] = Relationship(
         back_populates="possible_example"
     )
 
 
-class FinishedPossibleExamples(SQLModel, table=True):
+class FinishedPossibleExample(SQLModel, table=True):
     """
     Table to store all of the possible examples that have already been labeled by humans.
     """
@@ -144,3 +145,37 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: str
+
+
+class PossibleExampleResponse(BaseModel):
+    embedding_id: int
+    filename: str
+    timestamp_s: float
+    score: float
+    image_path: str
+    audio_path: str
+    target_species: str
+    target_call_type: str
+
+
+class AnnotatedRecording(BaseModel):
+    """
+    We provide a list of species labels because a recording may have multiple species in it.
+
+    Provenance is the name of the person who labeled the example.
+
+    The embedding_id is the id of the embedding in the hoplite db.
+
+    The image_path and audio_path are the paths to the image and audio of the recording.
+
+    The timestamp_s is the timestamp of the recording in seconds.
+
+    The filename is the filename of the recording (also called source in hoplite).
+    """
+
+    filename: str
+    timestamp_s: float
+    species_labels: List[str]
+    embedding_id: int
+    image_path: str
+    audio_path: str
