@@ -58,7 +58,9 @@ class AnnotatePossibleExamples:
         )
         self.hoplite_db.insert_label(label)
 
-    def get_possible_example_image_path(self, possible_example: PossibleExample) -> epath.Path:
+    def get_possible_example_image_path(
+        self, possible_example: PossibleExample
+    ) -> epath.Path | str:
         """
         Get the path to the image of the possible example.
         """
@@ -66,7 +68,9 @@ class AnnotatePossibleExamples:
             raise ValueError("Possible example must have an id.")
         return get_possible_example_image_path(possible_example.id, self.precompute_search_dir)
 
-    def get_possible_example_audio_path(self, possible_example: PossibleExample) -> epath.Path:
+    def get_possible_example_audio_path(
+        self, possible_example: PossibleExample
+    ) -> epath.Path | str:
         """
         Get the path to the audio of the possible example.
         """

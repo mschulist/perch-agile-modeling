@@ -43,9 +43,10 @@ class ExploreAnnotations:
         """
         return self.hoplite_db.get_class_counts()
 
-    def get_annotations_by_species(self, species_code: str) -> List[AnnotatedRecording]:
+    def get_annotations_by_label(self, label: str) -> List[AnnotatedRecording]:
         """
-        Get the annotations by the given species.
+        Get the annotations by the given label. Here label usually corresponds to the species code
+        (although it does not necessarily have to, such as an unknown label).
 
         Args:
             species_code: The species code to get the annotations for.
@@ -53,12 +54,12 @@ class ExploreAnnotations:
         Returns:
             List of AnnotatedRecordings for the given species.
         """
-        embedding_ids = self.hoplite_db.get_embeddings_by_label(label=species_code)
+        embedding_ids = self.hoplite_db.get_embeddings_by_label(label=label)
         if len(embedding_ids) == 0:
             return []
 
-        # we need to go through each id and find out if we have labeled any other species with the same embedding id
-        # if we have, then we need to get the species code for that embedding id
+        # we need to go through each id and find out if there are any other labels with the same embedding id
+        # if we have, then we need to get the label for that embedding id
         # TODO: ideally, there would be a more efficient way to do this (joins in the db), but that
         # would require changing the hoplite db interface...
 
@@ -77,10 +78,10 @@ class ExploreAnnotations:
         Helper method to get the AnnotatedRecording for the given embedding id.
         """
 
-        species_codes: List[str] = []
+        labels_list: List[str] = []
         labels = self.hoplite_db.get_labels(embedding_id=embedding_id)
         for label in labels:
-            species_codes.append(label.label)
+            labels_list.append(label.label)
 
         possible_example = self.db.get_possible_example_by_embed_id(embedding_id)
         if possible_example is None or possible_example.id is None:
@@ -95,7 +96,7 @@ class ExploreAnnotations:
 
         return AnnotatedRecording(
             embedding_id=embedding_id,
-            species_labels=species_codes,
+            species_labels=labels_list,
             filename=possible_example.filename,
             timestamp_s=possible_example.timestamp_s,
             audio_path=str(audio_path),

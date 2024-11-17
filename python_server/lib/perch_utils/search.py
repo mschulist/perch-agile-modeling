@@ -6,6 +6,7 @@ from ml_collections import config_dict
 from librosa import display as librosa_display
 import matplotlib.pyplot as plt
 
+from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 from chirp.projects.hoplite import interface, score_functions, brutalism, search_results
@@ -24,19 +25,23 @@ import numpy as np
 
 def get_possible_example_image_path(
     possible_example_id: int, precompute_search_dir: epath.Path
-) -> epath.Path:
+) -> epath.Path | str:
     """
     Get the path to the image for the possible example with the given id.
     """
+    if str(precompute_search_dir).startswith("gs://"):
+        return get_temp_gs_url(f"{str(precompute_search_dir)}/{possible_example_id}.png")
     return precompute_search_dir / f"{possible_example_id}.png"
 
 
 def get_possible_example_audio_path(
     possible_example_id: int, precompute_search_dir: epath.Path
-) -> epath.Path:
+) -> epath.Path | str:
     """
     Get the path to the audio for the possible example with the given id.
     """
+    if str(precompute_search_dir).startswith("gs://"):
+        return get_temp_gs_url(f"{str(precompute_search_dir)}/{possible_example_id}.wav")
     return precompute_search_dir / f"{possible_example_id}.wav"
 
 
