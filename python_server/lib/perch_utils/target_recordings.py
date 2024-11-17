@@ -3,7 +3,6 @@ from typing import Any, Optional, Sequence
 from etils import epath
 import numpy as np
 import requests
-from tqdm import tqdm
 
 from python_server.lib.db.db import AccountsDB
 from python_server.lib.models import TargetRecording
@@ -18,7 +17,9 @@ from chirp.taxonomy import namespace_db
 # TARGET_RECORDINGS_PATH = epath.Path("data/target_recordings")
 
 
-def get_target_recording_path(target_recording_id: int, target_path: epath.Path) -> epath.Path:
+def get_target_recording_path(
+    target_recording_id: int, target_path: epath.Path
+) -> epath.Path:
     """
     Get the path to the target recording with the given id.
     """
@@ -115,7 +116,6 @@ class GatherTargetRecordings:
         url = f'https://www.xeno-canto.org/api/2/recordings?query={scientific_name} type:"{call_type}" len:1-{self.max_len_s}'
 
         if "PYTEST_CURRENT_TEST" in os.environ:
-
             if scientific_name == "turdus migratorius":
                 return ["168640", "364119"]
             elif scientific_name == "piranga ludoviciana":
@@ -152,7 +152,9 @@ class GatherTargetRecordings:
             xc_ids.append(recording["id"])
         return xc_ids
 
-    def download_target_recording(self, xc_id: str, call_type: str, species_code: str) -> None:
+    def download_target_recording(
+        self, xc_id: str, call_type: str, species_code: str
+    ) -> None:
         """
         Given a xeno-canto id and relevant metadata, download the target recording and
         add it to the target_recordings database (so that we know we've already downloaded it).
@@ -163,7 +165,9 @@ class GatherTargetRecordings:
             species_code: Species code of the recording.
         """
         try:
-            audio = audio_utils.load_xc_audio(f"xc{xc_id}", sample_rate=self.sample_rate)
+            audio = audio_utils.load_xc_audio(
+                f"xc{xc_id}", sample_rate=self.sample_rate
+            )
             peaks = audio_utils.slice_peaked_audio(
                 audio=audio,
                 sample_rate_hz=self.sample_rate,
@@ -174,19 +178,28 @@ class GatherTargetRecordings:
                 audio_slice = audio[peak[0] : peak[1]]
                 timestamp_s: int = peak[0] // self.sample_rate
                 target_recording = TargetRecording(
-                    xc_id=xc_id, species=species_code, call_type=call_type, timestamp_s=timestamp_s
+                    xc_id=xc_id,
+                    species=species_code,
+                    call_type=call_type,
+                    timestamp_s=timestamp_s,
                 )
                 target_recording_id = self.db.add_target_recording(target_recording)
                 if target_recording_id is None:
                     raise ValueError("Failed to add target recording to the database.")
 
-                output_filepath = get_target_recording_path(target_recording_id, self.target_path)
+                output_filepath = get_target_recording_path(
+                    target_recording_id, self.target_path
+                )
                 with tempfile.NamedTemporaryFile() as tmp_file:
-                    wavfile.write(tmp_file.name, self.sample_rate, np.float32(audio_slice))
+                    wavfile.write(
+                        tmp_file.name, self.sample_rate, np.float32(audio_slice)
+                    )
                     epath.Path(tmp_file.name).copy(output_filepath)
         except Exception as e:
             print(f"Error processing xc id {xc_id}: {e}")
-            print("This error is likely due to the xeno-canto recording being unavailable.")
+            print(
+                "This error is likely due to the xeno-canto recording being unavailable."
+            )
 
     def process_req_for_targets(
         self,

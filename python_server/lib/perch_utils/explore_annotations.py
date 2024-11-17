@@ -1,6 +1,5 @@
 from typing import List, Optional
 from chirp.projects.hoplite import interface
-from matplotlib.pyplot import annotate
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 
@@ -9,6 +8,7 @@ from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
     get_possible_example_image_path,
 )
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 
 
 class ExploreAnnotations:
@@ -26,14 +26,16 @@ class ExploreAnnotations:
     def __init__(
         self,
         db: AccountsDB,
-        hoplite_db: interface.GraphSearchDBInterface,
+        hoplite_db: SQLiteUsearchDBExt,
         project_id: int,
         precompute_search_dir: str,
+        provenance: str,
     ):
         self.db = db
         self.hoplite_db = hoplite_db
         self.project_id = project_id
         self.precompute_search_dir = epath.Path(precompute_search_dir)
+        self.provenance = provenance
 
     def get_annotations_summary(self):
         """
@@ -65,7 +67,9 @@ class ExploreAnnotations:
 
         annotated_recordings: List[AnnotatedRecording] = []
         for embedding_id in embedding_ids:
-            annotated_recording = self._get_annotated_recording_by_embedding_id(embedding_id)
+            annotated_recording = self._get_annotated_recording_by_embedding_id(
+                embedding_id
+            )
             if annotated_recording is not None:
                 annotated_recordings.append(annotated_recording)
 
@@ -102,3 +106,53 @@ class ExploreAnnotations:
             audio_path=str(audio_path),
             image_path=str(image_path),
         )
+
+    def _remove_label(self, embedding_id: int, label: str):
+        """
+        Remove the given label from the given embedding id.
+
+        Ideally, this is not directly called from the api as it could be dangerous.
+
+        User should call change_annotation instead for more safety.
+
+        Args:
+            embedding_id: The embedding id to remove the label from.
+            label: The label to remove.
+        """
+        self.hoplite_db.remove_label(embedding_id, label)
+
+    def change_annotation(self, embedding_id: int, new_labels: List[str]):
+        """
+        Change the annotation for the given embedding id from the to the new labels.
+
+        Because we allow for multiple labels for a given embedding id, we need to make sure that
+        we are only changing the labels that we want to change.
+
+        To do this, we take the "detect" which labels are different and then remove the old labels
+        that have changed and add the new labels that have changed.
+
+        Args:
+            embedding_id: The embedding id to change the annotation for.
+            new_labels: The new labels to change to.
+        """
+        old_labels_set = {
+            x.label for x in self.hoplite_db.get_labels(embedding_id=embedding_id)
+        }
+        new_labels_set = set(new_labels)
+
+        labels_to_remove = old_labels_set - new_labels_set
+        labels_to_add = new_labels_set - old_labels_set
+
+        for label in labels_to_remove:
+            self._remove_label(embedding_id, label)
+
+        for label in labels_to_add:
+            label = interface.Label(
+                embedding_id=embedding_id,
+                label=label,
+                type=interface.LabelType.POSITIVE,
+                provenance=self.provenance,
+            )
+            self.hoplite_db.insert_label(label)
+
+        self.hoplite_db.commit()
