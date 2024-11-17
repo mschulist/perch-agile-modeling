@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 import os
 
 from google.cloud import storage
-from etils import epath
 
 load_dotenv()
 
@@ -44,7 +43,8 @@ def create_access_token(data: dict[Any, Any], expires_delta: timedelta | None = 
 
 
 async def get_current_user(
-    db: Annotated[AccountsDB, Depends(get_db)], token: Annotated[str, Depends(oauth2_scheme)]
+    db: Annotated[AccountsDB, Depends(get_db)],
+    token: Annotated[str, Depends(oauth2_scheme)],
 ):
     cred_except = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -72,7 +72,9 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+    )
 
 
 def authenticate_user(db: AccountsDB, email: str, password: str) -> User | None:

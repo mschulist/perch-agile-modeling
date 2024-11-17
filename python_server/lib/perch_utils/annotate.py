@@ -66,7 +66,9 @@ class AnnotatePossibleExamples:
         """
         if possible_example.id is None:
             raise ValueError("Possible example must have an id.")
-        return get_possible_example_image_path(possible_example.id, self.precompute_search_dir)
+        return get_possible_example_image_path(
+            possible_example.id, self.precompute_search_dir
+        )
 
     def get_possible_example_audio_path(
         self, possible_example: PossibleExample
@@ -76,7 +78,9 @@ class AnnotatePossibleExamples:
         """
         if possible_example.id is None:
             raise ValueError("Possible example must have an id.")
-        return get_possible_example_audio_path(possible_example.id, self.precompute_search_dir)
+        return get_possible_example_audio_path(
+            possible_example.id, self.precompute_search_dir
+        )
 
     def get_next_possible_example_with_data(self) -> Optional[PossibleExampleResponse]:
         """
@@ -90,7 +94,9 @@ class AnnotatePossibleExamples:
         image_path = self.get_possible_example_image_path(possible_example)
         audio_path = self.get_possible_example_audio_path(possible_example)
 
-        target_recording = self.db.get_target_recording(possible_example.target_recording_id)
+        target_recording = self.db.get_target_recording(
+            possible_example.target_recording_id
+        )
         if target_recording is None:
             raise ValueError("Target recording not found for possible example.")
 

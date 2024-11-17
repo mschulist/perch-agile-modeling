@@ -1,5 +1,5 @@
 from chirp.projects.agile2 import colab_utils, source_info
-from chirp.projects.hoplite import sqlite_usearch_impl
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 import os
 
 
@@ -12,7 +12,7 @@ def get_hoplite_db_path(project_id: int) -> str:
 
 def load_hoplite_db(project_id: int):
     db_path = get_hoplite_db_path(project_id)
-    return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path)
+    return SQLiteUsearchDBExt.create(db_path)
 
 
 def setup_hoplite_db(

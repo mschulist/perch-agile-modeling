@@ -13,9 +13,8 @@ from python_server.lib.models import (
 class AccountsDB:
     def __init__(self, db_name: str = "data/database.db"):
         sqlite_url = f"sqlite:///{db_name}"
-        engine = create_engine(sqlite_url)
-        self.engine = engine
-        self.session = Session(engine)
+        self.engine = create_engine(sqlite_url)
+        self.session = Session(self.engine, expire_on_commit=False)
 
     def setup(self):
         SQLModel.metadata.create_all(self.engine)
@@ -46,7 +45,10 @@ class AccountsDB:
             return project
 
     def get_target_recordings(
-        self, species_code: Optional[str], call_type: Optional[str], project_id: Optional[int]
+        self,
+        species_code: Optional[str],
+        call_type: Optional[str],
+        project_id: Optional[int],
     ) -> Sequence[TargetRecording]:
         """
         Get the list of previously gathered target recordings from the db that have not already been used by the project.
@@ -64,7 +66,9 @@ class AccountsDB:
             )
 
             statement = select(TargetRecording).where(
-                not_(col(TargetRecording.id).in_(select(subquery.c.target_recording_id)))
+                not_(
+                    col(TargetRecording.id).in_(select(subquery.c.target_recording_id))
+                )
             )
 
         if species_code is not None:
@@ -90,7 +94,9 @@ class AccountsDB:
             session.commit()
             return target_recording.id
 
-    def get_target_recording(self, target_recording_id: int) -> Optional[TargetRecording]:
+    def get_target_recording(
+        self, target_recording_id: int
+    ) -> Optional[TargetRecording]:
         """
         Get the target recording with the given id.
 
@@ -101,11 +107,15 @@ class AccountsDB:
             The target recording with the given id.
         """
         with Session(self.engine) as session:
-            statement = select(TargetRecording).where(TargetRecording.id == target_recording_id)
+            statement = select(TargetRecording).where(
+                TargetRecording.id == target_recording_id
+            )
             target_recording = session.exec(statement).first()
             return target_recording
 
-    def finish_target_recording(self, target_recording_id: int, project_id: int) -> None:
+    def finish_target_recording(
+        self, target_recording_id: int, project_id: int
+    ) -> None:
         """
         Finish the target recording with the given id.
 
@@ -122,7 +132,9 @@ class AccountsDB:
             session.add(finished_target_recording)
             session.commit()
 
-    def get_finished_targets(self, project_id: int) -> Sequence[FinishedTargetRecording]:
+    def get_finished_targets(
+        self, project_id: int
+    ) -> Sequence[FinishedTargetRecording]:
         """
         Get the list of finished target recordings for the given project.
 
@@ -150,9 +162,10 @@ class AccountsDB:
             The id of the possible example
         """
         with Session(self.engine) as session:
-            session.add(possible_example)
+            pos_ex = session.merge(possible_example)
+            session.add(pos_ex)
             session.commit()
-            return possible_example.id
+            return pos_ex.id
 
     def get_possible_examples(self, project_id: int) -> Sequence[PossibleExample]:
         """
@@ -165,7 +178,9 @@ class AccountsDB:
             The list of possible examples for the given project.
         """
         with Session(self.engine) as session:
-            statement = select(PossibleExample).where(PossibleExample.project_id == project_id)
+            statement = select(PossibleExample).where(
+                PossibleExample.project_id == project_id
+            )
             possible_examples = session.exec(statement).all()
             return possible_examples
 
@@ -190,7 +205,9 @@ class AccountsDB:
             )
 
             statement = select(PossibleExample).where(
-                not_(col(PossibleExample.id).in_(select(subquery.c.possible_example_id)))
+                not_(
+                    col(PossibleExample.id).in_(select(subquery.c.possible_example_id))
+                )
             )
 
             possible_example = session.exec(statement).first()
@@ -205,17 +222,22 @@ class AccountsDB:
         """
         with Session(self.engine) as session:
             finished_possible_example = FinishedPossibleExample(
-                possible_example_id=possible_example.id, project_id=possible_example.project_id
+                possible_example_id=possible_example.id,
+                project_id=possible_example.project_id,
             )
             session.add(finished_possible_example)
             session.commit()
 
-    def get_possible_example_by_embed_id(self, embedding_id: int) -> Optional[PossibleExample]:
+    def get_possible_example_by_embed_id(
+        self, embedding_id: int
+    ) -> Optional[PossibleExample]:
         """
         Given an embedding id from the hoplite db, get the possible example from the perch db.
         """
 
         with Session(self.engine) as session:
-            statement = select(PossibleExample).where(PossibleExample.embedding_id == embedding_id)
+            statement = select(PossibleExample).where(
+                PossibleExample.embedding_id == embedding_id
+            )
             possible_example = session.exec(statement).first()
             return possible_example

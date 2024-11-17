@@ -36,7 +36,9 @@ db = AccountsDB()
 
 
 @app.get("/users/me")
-async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+async def read_users_me(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
     return current_user
 
 
@@ -53,7 +55,9 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
 
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return Token(access_token=access_token, token_type="bearer")
@@ -101,7 +105,9 @@ async def create_project_db(
     if project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    success = setup_hoplite_db(project_id, dataset_base_path, dataset_fileglob, model_choice)
+    success = setup_hoplite_db(
+        project_id, dataset_base_path, dataset_fileglob, model_choice
+    )
 
     if not success:
         raise HTTPException(status_code=400, detail="DB already exists")
@@ -144,7 +150,8 @@ async def get_next_possible_example(
     project = db.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id] + [c.id for c in project.contributors]
+    # TODO: fix the allowed users
+    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -180,7 +187,8 @@ async def gather_possible_examples(
     project = db.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id] + [c.id for c in project.contributors]
+    # TODO: fix the allowed users
+    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -192,5 +200,7 @@ async def gather_possible_examples(
         target_path=TARGET_EXAMPLES_DIR,
         project_id=project_id,
     )
-    gatherer.get_possible_examples(species_codes, call_types, num_examples_per_target, num_targets)
+    gatherer.get_possible_examples(
+        species_codes, call_types, num_examples_per_target, num_targets
+    )
     return {"message": "Started to gather target recordings", "success": True}

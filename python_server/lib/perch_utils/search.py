@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from etils import epath
-from chirp.projects.hoplite import interface, score_functions, brutalism, search_results
+from chirp.projects.hoplite import sqlite_usearch_impl, interface
 from chirp.projects.zoo import model_configs
 from chirp.projects.agile2 import embedding_display
 from chirp import audio_utils
@@ -30,7 +30,9 @@ def get_possible_example_image_path(
     Get the path to the image for the possible example with the given id.
     """
     if str(precompute_search_dir).startswith("gs://"):
-        return get_temp_gs_url(f"{str(precompute_search_dir)}/{possible_example_id}.png")
+        return get_temp_gs_url(
+            f"{str(precompute_search_dir)}/{possible_example_id}.png"
+        )
     return precompute_search_dir / f"{possible_example_id}.png"
 
 
@@ -41,7 +43,9 @@ def get_possible_example_audio_path(
     Get the path to the audio for the possible example with the given id.
     """
     if str(precompute_search_dir).startswith("gs://"):
-        return get_temp_gs_url(f"{str(precompute_search_dir)}/{possible_example_id}.wav")
+        return get_temp_gs_url(
+            f"{str(precompute_search_dir)}/{possible_example_id}.wav"
+        )
     return precompute_search_dir / f"{possible_example_id}.wav"
 
 
@@ -49,7 +53,7 @@ class GatherPossibleExamples:
     def __init__(
         self,
         db: AccountsDB,
-        hoplite_db: interface.GraphSearchDBInterface,
+        hoplite_db: sqlite_usearch_impl.SQLiteUsearchDB,
         precompute_search_dir: epath.Path | str,
         target_path: epath.Path | str,
         project_id: int,
@@ -61,8 +65,8 @@ class GatherPossibleExamples:
         self.target_path = epath.Path(target_path)
 
         # set up the embedding model for the hoplite db
+        print("CONFIG", hoplite_db.get_metadata(None))
         perch_model_config = hoplite_db.get_metadata("model_config")
-        print("PERCH MODEL CONFIG", perch_model_config)
         # TODO: fix this crappy config
         if not isinstance(perch_model_config, config_dict.ConfigDict):
             raise ValueError("Model config must be a ConfigDict.")
@@ -77,7 +81,9 @@ class GatherPossibleExamples:
 
         self.sample_rate = self.embedding_model.sample_rate
 
-        self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0]["base_path"]  # type: ignore
+        self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0][  # type: ignore
+            "base_path"
+        ]
 
     def get_possible_examples(
         self,
@@ -109,11 +115,21 @@ class GatherPossibleExamples:
         # 2. Search the hoplite database for similar examples
         # This may involve some parallelization...at some point
         for target_recording in target_recordings:
-            results, scores = self.search_hoplite_db(target_recording, num_examples_per_comb)
+            close_results = self.search_hoplite_db(
+                target_recording, num_examples_per_comb
+            )
 
             # 3. Save the possible examples to the precompute search directory
-            for result, score in zip(results, scores):
-                self.save_search_result(result, score, target_recording)
+            for close_result in close_results:
+                self.save_search_result(
+                    close_result.key, close_result.distance, target_recording
+                )
+
+            # finish the targer recording: ie we have searched for all possible examples
+            # and do not want to search for them again using the same target recording
+            if target_recording.id is None:
+                raise ValueError("Target recording must have an id.")
+            self.db.finish_target_recording(target_recording.id, self.project_id)
 
     def get_target_recordings(
         self, species_codes: List[str], call_types: List[str], num_examples: int
@@ -122,7 +138,9 @@ class GatherPossibleExamples:
         Get the list of target recordings from the db.
         """
         targets = GatherTargetRecordings(self.db, self.target_path)
-        targets.process_req_for_targets(species_codes, call_types, num_examples, self.project_id)
+        targets.process_req_for_targets(
+            species_codes, call_types, num_examples, self.project_id
+        )
 
         return self.db.get_target_recordings(
             species_code=None, call_type=None, project_id=self.project_id
@@ -142,19 +160,12 @@ class GatherPossibleExamples:
 
         # search the hoplite db for similar examples
         # we don't use the scores right now, but maybe in the future we could...
-        score_fn = score_functions.get_score_fn("dot")
-        results, scores = brutalism.threaded_brute_search(
-            db=self.hoplite_db,
-            query_embedding=target_embedding,
-            search_list_size=num_examples,
-            score_fn=score_fn,  # type: ignore
-        )
-
-        return results, scores
+        close_results = self.hoplite_db.ui.search(target_embedding, num_examples)
+        return close_results
 
     def save_search_result(
         self,
-        search_result: search_results.SearchResult,
+        embedding_id: int,
         score: float,
         target_recording: TargetRecording,
     ):
@@ -167,9 +178,10 @@ class GatherPossibleExamples:
             target_recording: Target recording that the search result is associated with.
         """
         # insert into database
-        # TODO: figure out why the embedding id is returned as bytes, even through the interface
-        # claims that it is an int
-        embed_id = int.from_bytes(search_result.embedding_id, "little")  # type: ignore
+        embed_id = int.from_bytes(embedding_id, "little")  # type: ignore
+
+        target_recording = self.db.session.merge(target_recording)
+
         source = self.hoplite_db.get_embedding_source(embed_id)
         possible_example = PossibleExample(
             project_id=self.project_id,

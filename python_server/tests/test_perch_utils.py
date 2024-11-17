@@ -1,3 +1,4 @@
+from tqdm import tqdm
 from python_server.lib.perch_utils import GatherTargetRecordings
 from python_server.lib.db import AccountsDB
 from python_server.lib.perch_utils import GatherPossibleExamples
@@ -28,7 +29,9 @@ def test_process_req_for_targets():
 
     # check that the target recordings were added to the db
 
-    existing_targets = db.get_target_recordings(species_code=None, call_type=None, project_id=None)
+    existing_targets = db.get_target_recordings(
+        species_code=None, call_type=None, project_id=None
+    )
 
     # there should be 4 target recordings in the db, 1 for each of the 4 species/call type combinations
     assert len(existing_targets) == 4
@@ -47,7 +50,9 @@ def test_process_req_for_targets():
     # try again and make sure that no new target recordings are added
     targets.process_req_for_targets(species_codes, call_types, 1, project_id=None)
 
-    existing_targets = db.get_target_recordings(species_code=None, call_type=None, project_id=1)
+    existing_targets = db.get_target_recordings(
+        species_code=None, call_type=None, project_id=1
+    )
 
     assert len(existing_targets) == 4
 
@@ -56,7 +61,9 @@ def test_process_req_for_targets():
     assert existing_id is not None
     db.finish_target_recording(existing_id, 1)
 
-    existing_targets = db.get_target_recordings(species_code=None, call_type=None, project_id=1)
+    existing_targets = db.get_target_recordings(
+        species_code=None, call_type=None, project_id=1
+    )
 
     finished = db.get_finished_targets(1)
     assert len(finished) == 1
@@ -69,7 +76,7 @@ hoplite_db_path = tempfile.TemporaryDirectory()
 
 classes = ["amerob", "westan"]
 
-filenames = ["1.wav", "2.wav", "3.wav", "4.wav"]
+filenames = [f"{i}.wav" for i in tqdm(range(5))]
 
 test_utils.make_wav_files(
     hoplite_db_path.name, classes, filenames, file_len_s=20, sample_rate_hz=32000
@@ -94,7 +101,6 @@ configs = colab_utils.load_configs(
 )
 
 hoplite_db = configs.db_config.load_db()
-db.setup()
 
 worker = embed.EmbedWorker(
     audio_sources=configs.audio_sources_config,
@@ -116,13 +122,15 @@ def test_search_hoplite_db():
 
     gatherer = GatherPossibleExamples(
         db=db,
-        hoplite_db=hoplite_db,
+        hoplite_db=hoplite_db,  # type: ignore
         target_path=tmp_target_path.name,
         precompute_search_dir=precompute_dir.name,
         project_id=1,
     )
 
-    gatherer.get_possible_examples(species_codes, call_types, 1, num_target_recordings=1)
+    gatherer.get_possible_examples(
+        species_codes, call_types, 1, num_target_recordings=1
+    )
 
     possible_examples = db.get_possible_examples(project_id=1)
 
@@ -159,8 +167,8 @@ def test_annotate():
             break
         annotate.annotate_possible_example(ex, "westan", "test_user")
         num_examples += 1
-        image_path = annotate.get_possible_example_image_path(ex)
-        audio_path = annotate.get_possible_example_audio_path(ex)
+        image_path = epath.Path(annotate.get_possible_example_image_path(ex))
+        audio_path = epath.Path(annotate.get_possible_example_audio_path(ex))
         assert image_path.exists()
         assert audio_path.exists()
         image_path.copy(tmp_annotation_path / image_path.name)

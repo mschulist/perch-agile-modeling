@@ -1,13 +1,17 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from sqlmodel import Field, SQLModel, Relationship  # type: ignore
+from sqlmodel import Field, SQLModel, Relationship
 
 
 class ProjectContributor(SQLModel, table=True):
     __tablename__ = "project_contributors"  # type: ignore
 
-    project_id: Optional[int] = Field(default=None, foreign_key="projects.id", primary_key=True)
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True)
+    project_id: Optional[int] = Field(
+        default=None, foreign_key="projects.id", primary_key=True
+    )
+    user_id: Optional[int] = Field(
+        default=None, foreign_key="users.id", primary_key=True
+    )
 
 
 class User(SQLModel, table=True):
@@ -19,7 +23,8 @@ class User(SQLModel, table=True):
     hashed_password: str
 
     owned_projects: List["Project"] = Relationship(
-        back_populates="owner", sa_relationship_kwargs={"foreign_keys": "[Project.owner_id]"}
+        back_populates="owner",
+        sa_relationship_kwargs={"foreign_keys": "[Project.owner_id]"},
     )
     contributing_projects: List["Project"] = Relationship(
         back_populates="contributors", link_model=ProjectContributor
@@ -75,7 +80,9 @@ class TargetRecording(SQLModel, table=True):
     finished_target_recordings: List["FinishedTargetRecording"] = Relationship(
         back_populates="target_recording"
     )
-    possible_examples: List["PossibleExample"] = Relationship(back_populates="target_recording")
+    possible_examples: List["PossibleExample"] = Relationship(
+        back_populates="target_recording"
+    )
 
 
 class FinishedTargetRecording(SQLModel, table=True):
@@ -86,13 +93,17 @@ class FinishedTargetRecording(SQLModel, table=True):
     __tablename__ = "finished_target_recordings"  # type: ignore
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    target_recording_id: Optional[int] = Field(default=None, foreign_key="target_recordings.id")
+    target_recording_id: Optional[int] = Field(
+        default=None, foreign_key="target_recordings.id"
+    )
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
 
     target_recording: Optional[TargetRecording] = Relationship(
         back_populates="finished_target_recordings"
     )
-    project: Optional[Project] = Relationship(back_populates="finished_target_recordings")
+    project: Optional[Project] = Relationship(
+        back_populates="finished_target_recordings"
+    )
 
 
 class PossibleExample(SQLModel, table=True):
@@ -108,12 +119,16 @@ class PossibleExample(SQLModel, table=True):
     filename: str = Field(index=True)
     timestamp_s: float = Field(index=True)
     score: float = Field(index=True)
-    embedding_id: int = Field(index=True)
+    embedding_id: int = Field(index=True, unique=True)
 
-    target_recording_id: Optional[int] = Field(default=None, foreign_key="target_recordings.id")
+    target_recording_id: Optional[int] = Field(
+        default=None, foreign_key="target_recordings.id"
+    )
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
 
-    target_recording: Optional[TargetRecording] = Relationship(back_populates="possible_examples")
+    target_recording: Optional[TargetRecording] = Relationship(
+        back_populates="possible_examples"
+    )
     project: Optional[Project] = Relationship(back_populates="possible_examples")
 
     finished_possible_examples: List["FinishedPossibleExample"] = Relationship(
@@ -129,13 +144,17 @@ class FinishedPossibleExample(SQLModel, table=True):
     __tablename__ = "finished_possible_examples"  # type: ignore
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    possible_example_id: Optional[int] = Field(default=None, foreign_key="possible_examples.id")
+    possible_example_id: Optional[int] = Field(
+        default=None, foreign_key="possible_examples.id"
+    )
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
 
     possible_example: Optional[PossibleExample] = Relationship(
         back_populates="finished_possible_examples"
     )
-    project: Optional[Project] = Relationship(back_populates="finished_possible_examples")
+    project: Optional[Project] = Relationship(
+        back_populates="finished_possible_examples"
+    )
 
 
 class Token(BaseModel):
