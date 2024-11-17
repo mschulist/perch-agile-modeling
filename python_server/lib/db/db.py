@@ -209,3 +209,13 @@ class AccountsDB:
             )
             session.add(finished_possible_example)
             session.commit()
+
+    def get_possible_example_by_embed_id(self, embedding_id: int) -> Optional[PossibleExample]:
+        """
+        Given an embedding id from the hoplite db, get the possible example from the perch db.
+        """
+
+        with Session(self.engine) as session:
+            statement = select(PossibleExample).where(PossibleExample.embedding_id == embedding_id)
+            possible_example = session.exec(statement).first()
+            return possible_example

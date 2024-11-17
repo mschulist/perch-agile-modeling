@@ -148,6 +148,7 @@ class TokenData(BaseModel):
 
 
 class PossibleExampleResponse(BaseModel):
+    embedding_id: int
     filename: str
     timestamp_s: float
     score: float
@@ -155,3 +156,26 @@ class PossibleExampleResponse(BaseModel):
     audio_path: str
     target_species: str
     target_call_type: str
+
+
+class AnnotatedRecording(BaseModel):
+    """
+    We provide a list of species labels because a recording may have multiple species in it.
+
+    Provenance is the name of the person who labeled the example.
+
+    The embedding_id is the id of the embedding in the hoplite db.
+
+    The image_path and audio_path are the paths to the image and audio of the recording.
+
+    The timestamp_s is the timestamp of the recording in seconds.
+
+    The filename is the filename of the recording (also called source in hoplite).
+    """
+
+    filename: str
+    timestamp_s: float
+    species_labels: List[str]
+    embedding_id: int
+    image_path: str
+    audio_path: str

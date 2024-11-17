@@ -91,6 +91,7 @@ class AnnotatePossibleExamples:
             raise ValueError("Target recording not found for possible example.")
 
         return PossibleExampleResponse(
+            embedding_id=possible_example.embedding_id,
             filename=possible_example.filename,
             timestamp_s=possible_example.timestamp_s,
             score=possible_example.score,
