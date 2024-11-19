@@ -28,6 +28,7 @@ from .lib.models import (
 )
 from .lib.db import AccountsDB
 import dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 dotenv.load_dotenv()
 
@@ -38,6 +39,14 @@ TARGET_EXAMPLES_DIR = "data/target_examples"
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 db = AccountsDB()
 
