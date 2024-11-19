@@ -1,14 +1,13 @@
 'use client'
 
 import { User } from '@/models/auth'
-import { createContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { getCurrentUser } from '@/networking/server_requests'
 import { useRouter } from 'next/navigation'
-import Cookies from 'js-cookie'
 
-const authContext = createContext<User | null>(null)
+const AuthContext = createContext<User | null>(null)
 
-export const TOKEN_NAME = 'access_token'
+export const TOKEN_NAME = 'token'
 
 export function Auth(props: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -17,9 +16,8 @@ export function Auth(props: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function fetchData() {
-      const userCookie = Cookies.get(TOKEN_NAME)
-      console.log(userCookie)
-      if (!userCookie) {
+      const userToken = localStorage.getItem(TOKEN_NAME)
+      if (!userToken) {
         router.push('/login')
         return
       }
@@ -30,11 +28,16 @@ export function Auth(props: { children: React.ReactNode }) {
       }
       const user = await response.json()
       setUser(user)
+      router.push('/')
     }
     fetchData()
-  }, [user, router])
+  }, [])
 
   return (
-    <authContext.Provider value={user}>{props.children}</authContext.Provider>
+    <AuthContext.Provider value={user}>{props.children}</AuthContext.Provider>
   )
+}
+
+export const useAuth = (): User | null => {
+  return useContext(AuthContext)
 }

@@ -31,6 +31,14 @@ class User(SQLModel, table=True):
     )
 
 
+class UserResponse(BaseModel):
+    """
+    We do not return the hashed password in the response.
+    """
+    name: str
+    email: str
+
+
 class Project(SQLModel, table=True):
     __tablename__ = "projects"  # type: ignore
 

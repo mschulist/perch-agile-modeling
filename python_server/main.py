@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from typing import Annotated, List
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.responses import FileResponse
@@ -25,6 +25,7 @@ from .lib.models import (
     Project,
     Token,
     User,
+    UserResponse,
 )
 from .lib.db import AccountsDB
 import dotenv
@@ -32,7 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 dotenv.load_dotenv()
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 180
 
 PRECOMPUTE_SEARCH_DIR = "data/precompute_search"
 TARGET_EXAMPLES_DIR = "data/target_examples"
@@ -54,8 +55,8 @@ db = AccountsDB()
 @app.get("/users/me")
 async def read_users_me(
     current_user: Annotated[User, Depends(get_current_user)],
-) -> User:
-    return current_user
+) -> UserResponse:
+    return UserResponse(name=current_user.name, email=current_user.email)
 
 
 @app.post("/token")
@@ -75,7 +76,6 @@ async def login_for_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
 
-    response.set_cookie(key="access_token", value=access_token, httponly=True)
     return Token(access_token=access_token, token_type="bearer")
 
 
