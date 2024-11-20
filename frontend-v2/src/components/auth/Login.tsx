@@ -47,7 +47,7 @@ export function Login() {
     >
       <input
         type='email'
-        name='username' // FastAPI OAuth expects 'username'
+        name='username'
         value={email}
         placeholder='Email'
         className='input input-bordered w-full max-w-xs text-white'
@@ -66,11 +66,11 @@ export function Login() {
         required
       />
       <button type='submit' className='btn btn-primary' disabled={isLoading}>
-        {isLoading
-          ? <span className='loading loading-dots loading-lg'></span>
-          : (
-            'Login'
-          )}
+        {isLoading ? (
+          <span className='loading loading-dots loading-lg'></span>
+        ) : (
+          'Login'
+        )}
       </button>
       {error && <p className='text-red-500'>{error}</p>}
     </form>

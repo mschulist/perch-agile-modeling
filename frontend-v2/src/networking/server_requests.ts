@@ -13,7 +13,7 @@ export function getServerRequest(path: string): Promise<Response> {
 
 export function postServerRequest(
   path: string,
-  body: Record<string, unknown>,
+  body: Record<string, unknown>
 ): Promise<Response> {
   const token = localStorage.getItem('token')
   return fetch(`${SERVER_URL}/${path}`, {
