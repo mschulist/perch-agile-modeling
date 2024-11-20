@@ -15,13 +15,13 @@ export function ProjectSelector() {
   }, [])
 
   return (
-    <div className="dropdown">
-      <div tabIndex={0} role="button" className="btn m-1">
+    <div className='dropdown'>
+      <div tabIndex={0} role='button' className='btn m-1'>
         Current Project: {currentProject?.name}
       </div>
       <ul
         tabIndex={0}
-        className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow"
+        className='dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow'
       >
         {projects.map((project) => (
           <li key={project.id}>
