@@ -45,7 +45,7 @@ export type Project = {
   id: number
 }
 
-function getCurrentProject(): Project | null {
+export function getCurrentProject(): Project | null {
   const project = localStorage.getItem(CURRENT_PROJECT_KEY)
   return project ? JSON.parse(project) : null
 }
