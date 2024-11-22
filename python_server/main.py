@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 from typing import Annotated, List
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.responses import FileResponse
@@ -50,6 +50,21 @@ app.add_middleware(
 )
 
 db = AccountsDB()
+
+projects = db.get_all_projects()
+
+hoplite_dbs = {}
+
+for project in projects:
+    if project.id is None:
+        continue
+    hoplite_dbs[project.id] = load_hoplite_db(project.id)
+
+
+def get_hoplite_db(project_id: int):
+    if project_id not in hoplite_dbs:
+        hoplite_dbs[project_id] = load_hoplite_db(project_id)
+    return hoplite_dbs[project_id]
 
 
 @app.get("/users/me")
@@ -171,7 +186,7 @@ async def get_next_possible_example(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = load_hoplite_db(project_id)
+    hoplite_db = get_hoplite_db(project_id)
     annotate = AnnotatePossibleExamples(
         db=db,
         hoplite_db=hoplite_db,
@@ -208,7 +223,7 @@ async def gather_possible_examples(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = load_hoplite_db(project_id)
+    hoplite_db = get_hoplite_db(project_id)
     gatherer = GatherPossibleExamples(
         db=db,
         hoplite_db=hoplite_db,
@@ -239,7 +254,7 @@ async def annotate_example(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = load_hoplite_db(project_id)
+    hoplite_db = get_hoplite_db(project_id)
 
     annotate = AnnotatePossibleExamples(
         db=db,
@@ -265,7 +280,7 @@ async def get_label_summary(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = load_hoplite_db(project_id)
+    hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
         db=db,
@@ -291,7 +306,7 @@ async def get_annotations_by_label(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = load_hoplite_db(project_id)
+    hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
         db=db,
@@ -321,7 +336,7 @@ async def relabel_example(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = load_hoplite_db(project_id)
+    hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
         db=db,

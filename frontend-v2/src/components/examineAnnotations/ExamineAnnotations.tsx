@@ -32,7 +32,7 @@ export function ExamineAnnotations() {
           setSingleLabel={setSingleLabel}
         />
       </div>
-      {singleLabel && <SingleLabel label={singleLabel} />}
+      {singleLabel && <SingleLabel label={singleLabel} annotationSummary={annotationSummary}/>}
     </div>
   )
 }

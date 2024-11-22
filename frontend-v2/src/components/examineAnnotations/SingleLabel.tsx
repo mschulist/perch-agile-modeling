@@ -4,13 +4,21 @@ import { getServerRequest } from '@/networking/server_requests'
 import { getCurrentProject } from '../navigation/ProjectSelector'
 import { useEffect, useState } from 'react'
 import { AnnotatedRecording } from '@/models/perch'
+import { SingleAnnotation } from './SingleAnnotation'
 
-export function SingleLabel({ label }: { label: string }) {
+export function SingleLabel({
+  label,
+  annotationSummary,
+}: {
+  label: string
+  annotationSummary: Record<string, number>
+}) {
   const [annotations, setAnnotations] = useState<AnnotatedRecording[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     getSingleLabel(label).then((singleLabel) => {
+      console.log(singleLabel)
       setAnnotations(singleLabel)
       setLoading(false)
     })
@@ -18,31 +26,19 @@ export function SingleLabel({ label }: { label: string }) {
 
   return (
     <div className='flex flex-col w-full items-center'>
-      <h2 className='text-3xl'>Single Label</h2>
+      <h2 className='text-3xl'>{label}</h2>
       {loading && <span className='loading loading-infinity loading-lg'></span>}
       <ul>
-        {annotations.map((annotation) => (
-          <li key={annotation.filename}>
-            <p>Filename: {annotation.filename}</p>
-            <p>Offset: {annotation.timestamp_s} seconds</p>
-            <p>Labels: {annotation.species_labels.join(', ')}</p>
-            <img src={getUrl(annotation.image_path)} alt='annotation' />
-            <audio controls src={getUrl(annotation.audio_path)}></audio>
-          </li>
+        {annotations.map((annotation, i) => (
+          <SingleAnnotation
+            key={i}
+            annotation={annotation}
+            annotationSummary={annotationSummary}
+          />
         ))}
       </ul>
     </div>
   )
-}
-
-// TODO: make sure this is the correct server URL and check that it is not
-// already a gs url (then we would not want to prepend the server URL)
-function getUrl(path: string) {
-  const serverUrl = process.env.SERVER_URL || 'http://localhost:8000'
-  if (path.startsWith('gs://')) {
-    return path
-  }
-  return `${serverUrl}/get_file?filename=${path}`
 }
 
 async function getSingleLabel(label: string) {

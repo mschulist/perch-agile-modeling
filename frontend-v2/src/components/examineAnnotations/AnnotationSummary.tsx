@@ -10,7 +10,7 @@ export function AnnotationSummary({
     <ul>
       {Object.entries(annotationSummary).map(([label, count]) => (
         <li key={label}>
-          <button className='text-xl' onClick={() => setSingleLabel(label)}>
+          <button className='text-xl hover:scale-110 transition-transform' onClick={() => setSingleLabel(label)}>
             {label}: {count}
           </button>
         </li>

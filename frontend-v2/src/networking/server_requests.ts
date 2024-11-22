@@ -13,7 +13,7 @@ export function getServerRequest(path: string): Promise<Response> {
 
 export function postServerRequest(
   path: string,
-  body: Record<string, unknown>
+  body: unknown
 ): Promise<Response> {
   const token = localStorage.getItem('token')
   return fetch(`${SERVER_URL}/${path}`, {
@@ -38,4 +38,14 @@ export function loginRequest(formData: URLSearchParams): Promise<Response> {
 
 export function getCurrentUser(): Promise<Response> {
   return getServerRequest('users/me')
+}
+
+// TODO: make sure this is the correct server URL and check that it is not
+// already a gs url (then we would not want to prepend the server URL)
+export function getUrl(path: string) {
+  const serverUrl = process.env.SERVER_URL || 'http://localhost:8000'
+  if (path.startsWith('gs://')) {
+    return path
+  }
+  return `${serverUrl}/get_file?filename=${path}`
 }

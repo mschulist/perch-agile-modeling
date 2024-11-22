@@ -43,6 +43,12 @@ class AccountsDB:
             statement = select(Project).where(Project.id == project_id)
             project = session.exec(statement).first()
             return project
+    
+    def get_all_projects(self) -> Sequence[Project]:
+        with Session(self.engine) as session:
+            statement = select(Project)
+            projects = session.exec(statement).all()
+            return projects
 
     def get_target_recordings(
         self,
