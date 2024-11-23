@@ -186,7 +186,7 @@ class GatherPossibleExamples:
         possible_example = PossibleExample(
             project_id=self.project_id,
             score=score,
-            timestamp_s=source.offsets[0] // self.sample_rate,
+            timestamp_s=source.offsets[0],
             filename=source.source_id,
             target_recording_id=target_recording.id,
             target_recording=target_recording,

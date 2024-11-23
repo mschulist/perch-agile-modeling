@@ -19,7 +19,6 @@ export function SingleAnnotation({
   )
   const [editingLabels, setEditingLabels] = useState(false)
 
-  console.log(annotation.species_labels)
   useEffect(() => {
     setStrLabels(annotation.species_labels.join(','))
   }, [annotation.species_labels])

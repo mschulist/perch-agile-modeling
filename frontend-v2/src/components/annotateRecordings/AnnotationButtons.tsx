@@ -12,7 +12,7 @@ export function AnnotationButtons({
   return (
     <div className='flex flex-col w-full justify-center items-center gap-6'>
       <input
-        className='input input-bordered '
+        className='input input-bordered'
         type='text'
         placeholder={possibleExample.target_species}
         onChange={(e) => setLabels(e.target.value)}

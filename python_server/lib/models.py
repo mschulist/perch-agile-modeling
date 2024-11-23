@@ -35,6 +35,7 @@ class UserResponse(BaseModel):
     """
     We do not return the hashed password in the response.
     """
+
     name: str
     email: str
 

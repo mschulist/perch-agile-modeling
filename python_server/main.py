@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
+from python_server.lib.perch_utils.legacy_labels import LegacyLabels
 from python_server.lib.perch_utils.search import GatherPossibleExamples
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
@@ -168,7 +169,7 @@ async def create_project_db_legacy(
     return {"success": success}
 
 
-@app.post("/get_next_possible_example", response_model=PossibleExampleResponse)
+@app.post("/get_next_possible_example", response_model=PossibleExampleResponse | dict)
 async def get_next_possible_example(
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: int,
@@ -348,3 +349,32 @@ async def relabel_example(
 
     explore.change_annotation(embedding_id, labels)
     return {"message": "Relabeled example", "success": True}
+
+
+@app.post("/add_legacy_labels")
+async def add_legacy_labels(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    label_dir: str,
+):
+    """
+    Given a user and project (that they are a part of), add legacy labels to the project.
+    """
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    hoplite_db = get_hoplite_db(project_id)
+
+    legacy_labels = LegacyLabels(
+        db=db,
+        hoplite_db=hoplite_db,
+        label_dir=label_dir,
+        project_id=project_id,
+        annotator=current_user.name,
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+    )
+    legacy_labels.add_labels_to_new_db()

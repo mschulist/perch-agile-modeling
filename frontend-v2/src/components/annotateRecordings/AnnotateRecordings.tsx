@@ -10,24 +10,27 @@ import { AnnotationButtons } from './AnnotationButtons'
 export function AnnotateRecordings() {
   const [possibleExample, setPossibleExample] =
     useState<PossibleExample | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [loading, setLoading] = useState<boolean>(false)
 
   function annotateAndGetNextPossibleExample(labels: string[]) {
     postAnnotation(possibleExample!.embedding_id, labels).then(() => {
-      fetchNextPossibleExample().then((possibleExample) => {
+      fetchNextPossibleExample(setMessage).then((possibleExample) => {
         setPossibleExample(possibleExample)
       })
     })
   }
 
   useEffect(() => {
-    fetchNextPossibleExample().then((possibleExample) => {
+    fetchNextPossibleExample(setMessage).then((possibleExample) => {
+      setLoading(false)
       setPossibleExample(possibleExample)
     })
   }, [])
 
   return (
     <div className='flex flex-col items-center w-full p-8'>
-      {possibleExample ? (
+      {possibleExample && (
         <div className='card bg-base-300 shadow-xl w-1/2 max-w-xl'>
           <div className='card-body'>
             <h3 className='card-title'>Filename: {possibleExample.filename}</h3>
@@ -66,21 +69,29 @@ export function AnnotateRecordings() {
             </div>
           </div>
         </div>
-      ) : (
-        <span className='loading loading-infinity loading-lg'></span>
       )}
+      {loading && <span className='loading loading-infinity loading-lg'></span>}
+      {message && <p className='text-xl'>{message}</p>}
     </div>
   )
 }
 
-async function fetchNextPossibleExample() {
+async function fetchNextPossibleExample(setMessage: (message: string) => void) {
   const projectId = getCurrentProject()?.id
   const res = await postServerRequest(
     `get_next_possible_example?project_id=${projectId}`,
     {}
   )
   if (res.status === 200) {
-    return res.json()
+    const response = await res.json()
+    if (
+      'message' in response &&
+      response.message === 'No more possible examples'
+    ) {
+      setMessage(response.message)
+      return null
+    }
+    return response as PossibleExample
   } else {
     throw new Error('Failed to fetch next possible example')
   }

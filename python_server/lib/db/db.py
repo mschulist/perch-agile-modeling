@@ -43,7 +43,7 @@ class AccountsDB:
             statement = select(Project).where(Project.id == project_id)
             project = session.exec(statement).first()
             return project
-    
+
     def get_all_projects(self) -> Sequence[Project]:
         with Session(self.engine) as session:
             statement = select(Project)
@@ -226,6 +226,8 @@ class AccountsDB:
         Args:
             possible_example: The possible example to finish.
         """
+        if possible_example.id is None:
+            raise ValueError("Possible example must have an id.")
         with Session(self.engine) as session:
             finished_possible_example = FinishedPossibleExample(
                 possible_example_id=possible_example.id,
@@ -238,7 +240,7 @@ class AccountsDB:
         self, embedding_id: int
     ) -> Optional[PossibleExample]:
         """
-        Given an embedding id from the hoplite db, get the possible example from the perch db.
+        Given an embedding id from the hoplite db, get the possible example from the accounts db.
         """
 
         with Session(self.engine) as session:
