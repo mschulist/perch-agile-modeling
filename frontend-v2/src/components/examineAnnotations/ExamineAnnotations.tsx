@@ -50,7 +50,7 @@ export function ExamineAnnotations() {
   )
 }
 
-async function fetchAnnotationSummary(project_id: number) {
+export async function fetchAnnotationSummary(project_id: number) {
   const res = await getServerRequest(
     `get_label_summary?project_id=${project_id}`
   )

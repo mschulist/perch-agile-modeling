@@ -16,17 +16,25 @@ interface MultiSelectProps {
   options: string[]
   setLabels: (labels: string[]) => void
   labels: string[]
+  placeholder: string
+  required?: boolean
 }
 
-export function MultiSelect({ options, setLabels, labels }: MultiSelectProps) {
+export function MultiSelect({ options, setLabels, labels, placeholder, required }: MultiSelectProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>(labels)
   const [inputValue, setInputValue] = useState('')
 
+  const requireAtLeastOne = required ?? true
+
   useEffect(() => {
     setLabels(selected)
   }, [selected])
+
+  useEffect(() => {
+    setSelected(labels)
+  }, [labels])
 
   const handleUnselect = useCallback((value: string) => {
     setSelected((prev) => prev.filter((s) => s !== value))
@@ -80,7 +88,7 @@ export function MultiSelect({ options, setLabels, labels }: MultiSelectProps) {
                 className='rounded-lg py-3 text-lg bg-neutral w-fit'
               >
                 {value}
-                {selected.length > 1 && (
+                {(selected.length > 1 || !requireAtLeastOne)&& (
                   <button
                     className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-1'
                     onKeyDown={(e) => {
@@ -106,7 +114,7 @@ export function MultiSelect({ options, setLabels, labels }: MultiSelectProps) {
             onValueChange={setInputValue}
             onBlur={() => setOpen(false)}
             onFocus={() => setOpen(true)}
-            placeholder='Add labels...'
+            placeholder={placeholder}
             className='bg-transparent outline-none placeholder:text-muted-foreground input input-bordered'
           />
         </div>

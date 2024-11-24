@@ -60,7 +60,10 @@ class LegacyLabels:
 
                 # This will never label 2 things with the same embedding id, which is
                 # probably a bug, but fine for now.
-                if self.db.get_possible_example_by_embed_id(embed_id) is not None:
+                if (
+                    self.db.get_possible_example_by_embed_id(embed_id, self.project_id)
+                    is not None
+                ):
                     print(f"Embedding {embed_id} already in the database.")
                     continue
                 self.add_labeled_example_to_db(
@@ -107,7 +110,9 @@ class LegacyLabels:
         self.db.add_possible_example(possible_example)
 
         # we need to get the example from the db to get the id
-        possible_example = self.db.get_possible_example_by_embed_id(embedding_id)
+        possible_example = self.db.get_possible_example_by_embed_id(
+            embedding_id, self.project_id
+        )
         if possible_example is None:
             raise ValueError("Failed to get possible example from the database.")
         if possible_example.id is None:

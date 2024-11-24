@@ -85,7 +85,7 @@ class AnnotatePossibleExamples:
             annotations: The list of labels for the embedding id.
             provenance: The provenance of the label. Name of the person who labeled the example.
         """
-        possible_example = self.db.get_possible_example_by_embed_id(embedding_id)
+        possible_example = self.db.get_possible_example_by_embed_id(embedding_id, self.project_id)
         if possible_example is None:
             raise ValueError("Possible example not found for embedding id.")
         if len(annotations) == 0:

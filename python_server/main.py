@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
+from python_server.lib.all_species_codes import get_all_species_codes
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
@@ -378,3 +379,27 @@ async def add_legacy_labels(
         precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
     )
     legacy_labels.add_labels_to_new_db()
+
+
+@app.get("/all_species_codes")
+async def all_species_codes():
+    codes = get_all_species_codes()
+    return {"species_codes": codes}
+
+
+@app.get("/old_target_codes")
+async def old_target_codes(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+
+    return {
+        "old_target_codes": ["ALDERFLYCATCHER", "AMERICANROBIN", "AMERICANWOODCOCK"]
+    }

@@ -69,6 +69,7 @@ export function SingleAnnotation({
                 options={Object.keys(annotationSummary)}
                 setLabels={setNewLabels}
                 labels={newLabels}
+                placeholder='New labels...'
               />
             </>
           ) : (

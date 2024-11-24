@@ -237,7 +237,7 @@ class AccountsDB:
             session.commit()
 
     def get_possible_example_by_embed_id(
-        self, embedding_id: int
+        self, embedding_id: int, project_id: int
     ) -> Optional[PossibleExample]:
         """
         Given an embedding id from the hoplite db, get the possible example from the accounts db.
@@ -246,6 +246,7 @@ class AccountsDB:
         with Session(self.engine) as session:
             statement = select(PossibleExample).where(
                 PossibleExample.embedding_id == int(embedding_id)
+                and PossibleExample.project_id == project_id
             )
             possible_example = session.exec(statement).first()
             return possible_example
