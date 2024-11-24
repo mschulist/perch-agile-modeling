@@ -18,7 +18,11 @@ interface MultiSelectProps {
   strLabels: string
 }
 
-export function MultiSelect({ options, setStrLabels, strLabels }: MultiSelectProps) {
+export function MultiSelect({
+  options,
+  setStrLabels,
+  strLabels,
+}: MultiSelectProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>(strLabels.split(','))
@@ -70,13 +74,17 @@ export function MultiSelect({ options, setStrLabels, strLabels }: MultiSelectPro
       onKeyDown={handleKeyDown}
       className='overflow-visible bg-transparent'
     >
-      <div className='group rounded-md border border-input px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2'>
-        <div className='flex flex-wrap gap-1'>
+      <div className='group rounded-lg py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2'>
+        <div className='flex flex-col gap-1'>
           {selected.map((value) => (
-            <Badge key={value} variant='secondary'>
+            <Badge
+              key={value}
+              variant='secondary'
+              className='rounded-full py-3 text-lg'
+            >
               {value}
               <button
-                className='ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2'
+                className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-muted ml-1'
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleUnselect(value)
@@ -99,50 +107,48 @@ export function MultiSelect({ options, setStrLabels, strLabels }: MultiSelectPro
             onBlur={() => setOpen(false)}
             onFocus={() => setOpen(true)}
             placeholder='Select or type values...'
-            className='ml-2 flex-1 bg-transparent outline-none placeholder:text-muted-foreground'
+            className='bg-transparent outline-none placeholder:text-muted-foreground input input-bordered'
           />
         </div>
       </div>
       {open && (
         <div className='relative mt-2'>
-          <CommandList>
-            <div className='absolute top-0 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in'>
-              <CommandGroup className='h-full overflow-auto'>
-                {filteredOptions.map((option) => (
-                  <CommandItem
-                    key={option}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                    }}
-                    onSelect={() => {
-                      setSelected((prev) => [...prev, option])
+          <CommandList className='rounded-lg shadow-md'>
+            <CommandGroup className='h-full overflow-auto'>
+              {filteredOptions.map((option) => (
+                <CommandItem
+                  key={option}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onSelect={() => {
+                    setSelected((prev) => [...prev, option])
+                    setInputValue('')
+                  }}
+                  className='cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground'
+                >
+                  {option}
+                </CommandItem>
+              ))}
+              {filteredOptions.length === 0 && inputValue && (
+                <CommandItem
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onSelect={() => {
+                    if (!selected.includes(inputValue) && inputValue) {
+                      setSelected((prev) => [...prev, inputValue])
                       setInputValue('')
-                    }}
-                    className='cursor-pointer'
-                  >
-                    {option}
-                  </CommandItem>
-                ))}
-                {filteredOptions.length === 0 && (
-                  <CommandItem
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                    }}
-                    onSelect={() => {
-                      if (!selected.includes(inputValue) && inputValue) {
-                        setSelected((prev) => [...prev, inputValue])
-                        setInputValue('')
-                      }
-                    }}
-                    className='cursor-pointer'
-                  >
-                    Add "{inputValue}"
-                  </CommandItem>
-                )}
-              </CommandGroup>
-            </div>
+                    }
+                  }}
+                  className='cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground'
+                >
+                  Add "{inputValue}"
+                </CommandItem>
+              )}
+            </CommandGroup>
           </CommandList>
         </div>
       )}

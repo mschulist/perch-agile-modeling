@@ -43,15 +43,17 @@ export function SingleAnnotation({
           {editingLabels ? 'Save' : 'Change Labels'}
         </button>
         <div className='text-sm text-gray-400'>
-          Labels:{' '}
           {editingLabels ? (
-            <MultiSelect
-              options={Object.keys(annotationSummary)}
-              setStrLabels={setStrLabels}
-              strLabels={strLabels}
-            />
+            <>
+              New labels:
+              <MultiSelect
+                options={Object.keys(annotationSummary)}
+                setStrLabels={setStrLabels}
+                strLabels={strLabels}
+              />
+            </>
           ) : (
-            strLabels
+            `Labels: ${strLabels}`
           )}
         </div>
         <figure>
@@ -60,7 +62,7 @@ export function SingleAnnotation({
             width={450}
             height={550}
             alt='annotation'
-            className='rounded-lg'
+            className='rounded-xl'
           />
         </figure>
         <audio
