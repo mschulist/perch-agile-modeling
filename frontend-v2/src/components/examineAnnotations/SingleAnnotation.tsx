@@ -2,9 +2,10 @@
 
 import { AnnotatedRecording } from '@/models/perch'
 import { getUrl, postServerRequest } from '@/networking/server_requests'
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { getCurrentProject } from '../navigation/ProjectSelector'
+import { MultiSelect } from './MultiSelect'
 
 export function SingleAnnotation({
   annotation,
@@ -44,11 +45,10 @@ export function SingleAnnotation({
         <div className='text-sm text-gray-400'>
           Labels:{' '}
           {editingLabels ? (
-            <input
-              type='text'
-              className='input input-bordered'
-              value={strLabels}
-              onChange={(e) => setStrLabels(e.target.value)}
+            <MultiSelect
+              options={Object.keys(annotationSummary)}
+              setStrLabels={setStrLabels}
+              strLabels={strLabels}
             />
           ) : (
             strLabels

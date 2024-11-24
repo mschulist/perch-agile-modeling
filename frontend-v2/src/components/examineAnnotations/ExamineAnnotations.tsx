@@ -29,7 +29,7 @@ export function ExamineAnnotations() {
         annotationSummary={annotationSummary}
         setSingleLabel={setSingleLabel}
       />
-      {singleLabel && (
+      {singleLabel != null && (
         <SingleLabel
           label={singleLabel}
           annotationSummary={annotationSummary}

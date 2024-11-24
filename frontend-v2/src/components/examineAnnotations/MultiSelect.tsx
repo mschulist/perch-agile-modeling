@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -14,13 +14,19 @@ import { Command as CommandPrimitive } from 'cmdk'
 
 interface MultiSelectProps {
   options: string[]
+  setStrLabels: (labels: string) => void
+  strLabels: string
 }
 
-export function MultiSelect({ options }: MultiSelectProps) {
+export function MultiSelect({ options, setStrLabels, strLabels }: MultiSelectProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState<string[]>([])
+  const [selected, setSelected] = useState<string[]>(strLabels.split(','))
   const [inputValue, setInputValue] = useState('')
+
+  useEffect(() => {
+    setStrLabels(selected.join(','))
+  }, [selected])
 
   const handleUnselect = useCallback((value: string) => {
     setSelected((prev) => prev.filter((s) => s !== value))
