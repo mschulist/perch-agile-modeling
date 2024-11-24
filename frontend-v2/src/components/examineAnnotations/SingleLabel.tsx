@@ -25,18 +25,22 @@ export function SingleLabel({
   }, [label])
 
   return (
-    <div className='flex flex-col w-full items-center'>
-      <h2 className='text-3xl'>{label}</h2>
-      {loading && <span className='loading loading-infinity loading-lg'></span>}
-      <ul>
-        {annotations.map((annotation, i) => (
-          <SingleAnnotation
-            key={i}
-            annotation={annotation}
-            annotationSummary={annotationSummary}
-          />
-        ))}
-      </ul>
+    <div className='flex flex-col items-center'>
+      <h2 className='text-3xl mb-2'>{label}</h2>
+      <div className='flex flex-col w-fit p-10 items-center h-full overflow-y-scroll bg-base-200 rounded-xl'>
+        {loading && (
+          <span className='loading loading-infinity loading-lg'></span>
+        )}
+        <ul>
+          {annotations.map((annotation, i) => (
+            <SingleAnnotation
+              key={i}
+              annotation={annotation}
+              annotationSummary={annotationSummary}
+            />
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

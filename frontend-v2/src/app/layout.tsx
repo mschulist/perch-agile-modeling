@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <Auth>
-        <body>
+        <body className='h-screen'>
           <Navbar />
           {children}
         </body>

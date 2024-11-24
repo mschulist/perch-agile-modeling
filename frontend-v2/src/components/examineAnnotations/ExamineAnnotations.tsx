@@ -24,14 +24,11 @@ export function ExamineAnnotations() {
   }, [])
 
   return (
-    <div className='flex flex-row w-full'>
-      <div className='flex flex-col w-full items-center'>
-        <h2 className='text-3xl'>Annotation Summary</h2>
-        <AnnotationSummary
-          annotationSummary={annotationSummary}
-          setSingleLabel={setSingleLabel}
-        />
-      </div>
+    <div className='flex flex-row w-full justify-evenly'>
+      <AnnotationSummary
+        annotationSummary={annotationSummary}
+        setSingleLabel={setSingleLabel}
+      />
       {singleLabel && (
         <SingleLabel
           label={singleLabel}

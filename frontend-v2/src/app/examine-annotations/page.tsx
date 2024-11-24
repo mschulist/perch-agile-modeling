@@ -2,7 +2,7 @@ import { ExamineAnnotations } from '@/components/examineAnnotations/ExamineAnnot
 
 export default function ExamineAnnotationsPage() {
   return (
-    <div className='flex h-screen align-middle'>
+    <div className='flex h-5/6 align-middle'>
       <ExamineAnnotations />
     </div>
   )

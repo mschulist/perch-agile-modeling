@@ -57,8 +57,8 @@ export function SingleAnnotation({
         <figure>
           <Image
             src={getUrl(annotation.image_path)}
-            width={350}
-            height={300}
+            width={450}
+            height={550}
             alt='annotation'
             className='rounded-lg'
           />
