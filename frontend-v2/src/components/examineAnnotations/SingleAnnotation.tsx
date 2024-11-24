@@ -2,7 +2,7 @@
 
 import { AnnotatedRecording } from '@/models/perch'
 import { getUrl, postServerRequest } from '@/networking/server_requests'
-import { use, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { getCurrentProject } from '../navigation/ProjectSelector'
 import { MultiSelect } from './MultiSelect'
@@ -16,20 +16,37 @@ export function SingleAnnotation({
   annotationSummary: Record<string, number>
   refreshAnnotationSummary: () => void
 }) {
-  // TODO: make a nice drop down for selecting labels
-  const [strLabels, setStrLabels] = useState(
-    annotation.species_labels.join(',')
-  )
+  const [labels, setLabels] = useState(annotation.species_labels)
+  const [newLabels, setNewLabels] = useState<string[]>(labels)
   const [editingLabels, setEditingLabels] = useState(false)
 
   useEffect(() => {
-    setStrLabels(annotation.species_labels.join(','))
+    setLabels(annotation.species_labels)
+    setNewLabels(annotation.species_labels)
   }, [annotation.species_labels])
+
+  function handleLabelSave() {
+    if (newLabels === labels) {
+      return
+    }
+    postNewLabels(annotation.embedding_id, newLabels)
+      .then(() => {
+        setLabels(newLabels)
+        refreshAnnotationSummary()
+      })
+      .catch((e) => {
+        console.error(e)
+      })
+  }
+
+  const newLabelsInAnnotation = labels.some((label) =>
+    annotation.species_labels.includes(label)
+  )
 
   return (
     <li
       key={annotation.filename}
-      className='card shadow-xl compact bg-base-300 p-2 m-4'
+      className={`card shadow-xl compact bg-base-300 p-2 m-4 ${newLabelsInAnnotation ? '' : 'hidden'}`}
     >
       <div className='card-body'>
         <h2 className='card-title'>{annotation.filename}</h2>
@@ -37,13 +54,7 @@ export function SingleAnnotation({
           className={`btn btn-xs ${editingLabels ? 'btn-secondary' : 'btn-primary'} w-32`}
           onClick={() => {
             if (editingLabels) {
-              postNewLabels(annotation.embedding_id, strLabels.split(','))
-                .then(() => {
-                  refreshAnnotationSummary()
-                })
-                .catch((e) => {
-                  console.error(e)
-                })
+              handleLabelSave()
             }
             setEditingLabels(!editingLabels)
           }}
@@ -56,12 +67,12 @@ export function SingleAnnotation({
               New labels:
               <MultiSelect
                 options={Object.keys(annotationSummary)}
-                setStrLabels={setStrLabels}
-                strLabels={strLabels}
+                setLabels={setNewLabels}
+                labels={newLabels}
               />
             </>
           ) : (
-            `Labels: ${strLabels}`
+            `Labels: ${labels}`
           )}
         </div>
         <figure>

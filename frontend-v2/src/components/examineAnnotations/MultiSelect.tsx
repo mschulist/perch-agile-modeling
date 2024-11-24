@@ -14,22 +14,18 @@ import { Command as CommandPrimitive } from 'cmdk'
 
 interface MultiSelectProps {
   options: string[]
-  setStrLabels: (labels: string) => void
-  strLabels: string
+  setLabels: (labels: string[]) => void
+  labels: string[]
 }
 
-export function MultiSelect({
-  options,
-  setStrLabels,
-  strLabels,
-}: MultiSelectProps) {
+export function MultiSelect({ options, setLabels, labels }: MultiSelectProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState<string[]>(strLabels.split(','))
+  const [selected, setSelected] = useState<string[]>(labels)
   const [inputValue, setInputValue] = useState('')
 
   useEffect(() => {
-    setStrLabels(selected.join(','))
+    setLabels(selected)
   }, [selected])
 
   const handleUnselect = useCallback((value: string) => {
@@ -84,21 +80,23 @@ export function MultiSelect({
                 className='rounded-lg py-3 text-lg bg-neutral w-fit'
               >
                 {value}
-                <button
-                  className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-1'
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleUnselect(value)
-                    }
-                  }}
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onClick={() => handleUnselect(value)}
-                >
-                  <X className='h-3 w-3 text-muted-foreground hover:text-foreground' />
-                </button>
+                {selected.length > 1 && (
+                  <button
+                    className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-1'
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUnselect(value)
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onClick={() => handleUnselect(value)}
+                  >
+                    <X className='h-3 w-3 text-muted-foreground hover:text-foreground' />
+                  </button>
+                )}
               </Badge>
             ))}
           </div>
