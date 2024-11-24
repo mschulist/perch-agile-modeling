@@ -10,9 +10,11 @@ import { MultiSelect } from './MultiSelect'
 export function SingleAnnotation({
   annotation,
   annotationSummary,
+  refreshAnnotationSummary,
 }: {
   annotation: AnnotatedRecording
   annotationSummary: Record<string, number>
+  refreshAnnotationSummary: () => void
 }) {
   // TODO: make a nice drop down for selecting labels
   const [strLabels, setStrLabels] = useState(
@@ -36,6 +38,12 @@ export function SingleAnnotation({
           onClick={() => {
             if (editingLabels) {
               postNewLabels(annotation.embedding_id, strLabels.split(','))
+                .then(() => {
+                  refreshAnnotationSummary()
+                })
+                .catch((e) => {
+                  console.error(e)
+                })
             }
             setEditingLabels(!editingLabels)
           }}

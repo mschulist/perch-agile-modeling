@@ -75,38 +75,40 @@ export function MultiSelect({
       className='overflow-visible bg-transparent'
     >
       <div className='group rounded-lg py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2'>
-        <div className='flex flex-col gap-1'>
-          {selected.map((value) => (
-            <Badge
-              key={value}
-              variant='secondary'
-              className='rounded-full py-3 text-lg'
-            >
-              {value}
-              <button
-                className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-muted ml-1'
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleUnselect(value)
-                  }
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onClick={() => handleUnselect(value)}
+        <div className='flex flex-col gap-2'>
+          <div className='flex gap-1 flex-wrap'>
+            {selected.map((value) => (
+              <Badge
+                key={value}
+                variant='secondary'
+                className='rounded-lg py-3 text-lg bg-neutral w-fit'
               >
-                <X className='h-3 w-3 text-muted-foreground hover:text-foreground' />
-              </button>
-            </Badge>
-          ))}
+                {value}
+                <button
+                  className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-1'
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleUnselect(value)
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onClick={() => handleUnselect(value)}
+                >
+                  <X className='h-3 w-3 text-muted-foreground hover:text-foreground' />
+                </button>
+              </Badge>
+            ))}
+          </div>
           <CommandPrimitive.Input
             ref={inputRef}
             value={inputValue}
             onValueChange={setInputValue}
             onBlur={() => setOpen(false)}
             onFocus={() => setOpen(true)}
-            placeholder='Select or type values...'
+            placeholder='Add labels...'
             className='bg-transparent outline-none placeholder:text-muted-foreground input input-bordered'
           />
         </div>
@@ -126,7 +128,7 @@ export function MultiSelect({
                     setSelected((prev) => [...prev, option])
                     setInputValue('')
                   }}
-                  className='cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground'
+                  className='cursor-pointer rounded-xl hover:bg-accent hover:text-accent-foreground text-base'
                 >
                   {option}
                 </CommandItem>

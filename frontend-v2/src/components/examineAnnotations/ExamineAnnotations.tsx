@@ -23,6 +23,16 @@ export function ExamineAnnotations() {
     })
   }, [])
 
+  function refreshAnnotationSummary() {
+    const projectId = getCurrentProject()?.id
+    if (!projectId) {
+      return
+    }
+    fetchAnnotationSummary(projectId).then((summary) => {
+      setAnnotationSummary(summary)
+    })
+  }
+
   return (
     <div className='flex flex-row w-full justify-evenly'>
       <AnnotationSummary
@@ -33,6 +43,7 @@ export function ExamineAnnotations() {
         <SingleLabel
           label={singleLabel}
           annotationSummary={annotationSummary}
+          refreshAnnotationSummary={refreshAnnotationSummary}
         />
       )}
     </div>

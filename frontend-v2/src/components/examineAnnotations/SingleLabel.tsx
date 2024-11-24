@@ -9,9 +9,11 @@ import { SingleAnnotation } from './SingleAnnotation'
 export function SingleLabel({
   label,
   annotationSummary,
+  refreshAnnotationSummary,
 }: {
   label: string
   annotationSummary: Record<string, number>
+  refreshAnnotationSummary: () => void
 }) {
   const [annotations, setAnnotations] = useState<AnnotatedRecording[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,6 +39,7 @@ export function SingleLabel({
               key={i}
               annotation={annotation}
               annotationSummary={annotationSummary}
+              refreshAnnotationSummary={refreshAnnotationSummary}
             />
           ))}
         </ul>
