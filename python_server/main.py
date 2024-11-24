@@ -9,6 +9,7 @@ from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
 from python_server.lib.perch_utils.search import GatherPossibleExamples
+from python_server.lib.perch_utils.summary import get_summary
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
 
@@ -25,6 +26,7 @@ from .lib.models import (
     AnnotatedRecording,
     PossibleExampleResponse,
     Project,
+    RecordingsSummary,
     Token,
     User,
     UserResponse,
@@ -387,3 +389,19 @@ async def add_legacy_labels(
 async def all_species_codes():
     codes = get_all_species_codes()
     return {"species_codes": codes}
+
+
+@app.get("/recordings_summary", response_model=RecordingsSummary)
+async def recordings_summary(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    summary = get_summary(project_id, db, get_hoplite_db(project_id))
+    print(summary)
+    return summary

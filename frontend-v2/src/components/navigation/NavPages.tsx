@@ -23,6 +23,9 @@ export function NavPages() {
         <li>
           <Link href='/examine-annotations'>Examine Annotations</Link>
         </li>
+        <li>
+          <Link href='/summary'>Summary</Link>
+        </li>
       </ul>
     </div>
   )

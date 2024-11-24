@@ -54,3 +54,11 @@ class SQLiteUsearchDBExt(sqlite_usearch_impl.SQLiteUsearchDB):
             "DELETE FROM hoplite_labels WHERE embedding_id = ? AND label = ?",
             (embedding_id, label),
         )
+
+    def get_num_sources(self) -> int:
+        """
+        Get the number of sources in the db.
+        """
+        cursor = self._get_cursor()
+        cursor.execute("SELECT COUNT(*) FROM hoplite_sources")
+        return cursor.fetchone()[0]

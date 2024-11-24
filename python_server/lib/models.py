@@ -207,3 +207,15 @@ class AnnotatedRecording(BaseModel):
     embedding_id: int
     image_path: str
     audio_path: str
+
+
+class RecordingsSummary(BaseModel):
+    """
+    Summary of the recordings for a project.
+    """
+
+    num_finished_possible_examples: int
+    num_labels: int
+    num_embeddings: int
+    num_source_files: int
+    hours_recordings: float
