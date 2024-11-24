@@ -15,7 +15,7 @@ export function Search() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [numTargets, setNumTargets] = useState<number>(3)
   const [numExPerTarget, setNumExPerTarget] = useState<number>(5)
-  const [searchSuccess, setSearchSuccess] = useState<boolean>(false)
+  const [searchSuccess, setSearchSuccess] = useState<string>('')
 
   useEffect(() => {
     getAllSpeciesCodes().then((codes) => {
@@ -23,7 +23,7 @@ export function Search() {
     })
   }, [])
 
-  function handleSearch() {
+  async function handleSearch() {
     const [validCodes, errorCodes] = checkSpeciesCodes(
       speciesCodes,
       allSpeciesCodes
@@ -52,8 +52,19 @@ export function Search() {
       return
     }
     setErrorMessage(null)
-    postSearchRequest(speciesCodes, call_types, numTargets, numExPerTarget)
-    setSearchSuccess(true)
+    const res = await postSearchRequest(
+      speciesCodes,
+      call_types,
+      numTargets,
+      numExPerTarget
+    )
+    if (res.status !== 200) {
+      setErrorMessage('Search request failed')
+      return
+    } else {
+      const response = await res.json()
+      setSearchSuccess(response.message)
+    }
   }
 
   return (
@@ -104,9 +115,7 @@ export function Search() {
         Search
       </button>
       {errorMessage && <p className='text-red-500'>{errorMessage}</p>}
-      {searchSuccess && (
-        <p className='text-green-500'>Search request successful</p>
-      )}
+      {searchSuccess && <p className='text-green-500'>{searchSuccess}</p>}
     </div>
   )
 }
@@ -133,7 +142,7 @@ function checkSpeciesCodes(
   return [false, invalidCodes]
 }
 
-function postSearchRequest(
+async function postSearchRequest(
   speciesCodes: string[],
   callTypes: string[],
   numTargets: number,
@@ -143,13 +152,14 @@ function postSearchRequest(
   if (!projectId) {
     throw new Error('No project selected')
   }
-  postServerRequest(
+  const res = await postServerRequest(
     `gather_possible_examples?project_id=${projectId}&num_examples_per_target=${numExPerTarget}&num_targets=${numTargets}`,
     {
       species_codes: speciesCodes,
       call_types: callTypes,
     }
   )
+  return res
 }
 
 function checkCallTypes(callTypes: string[]) {

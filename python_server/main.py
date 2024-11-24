@@ -205,6 +205,8 @@ async def get_next_possible_example(
 async def get_file(filename: str):
     # TODO: Check if the file is in the precompute search dir
     # for security reasons
+    if not filename.startswith(PRECOMPUTE_SEARCH_DIR):
+        raise HTTPException(status_code=403, detail="Forbidden")
     return FileResponse(filename)
 
 
@@ -385,21 +387,3 @@ async def add_legacy_labels(
 async def all_species_codes():
     codes = get_all_species_codes()
     return {"species_codes": codes}
-
-
-@app.get("/old_target_codes")
-async def old_target_codes(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
-):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    
-
-    return {
-        "old_target_codes": ["ALDERFLYCATCHER", "AMERICANROBIN", "AMERICANWOODCOCK"]
-    }

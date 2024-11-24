@@ -4,6 +4,7 @@ import { User } from '@/models/auth'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { getCurrentUser } from '@/networking/server_requests'
 import { useRouter } from 'next/navigation'
+import { getCurrentProject } from '../navigation/ProjectSelector'
 
 const AuthContext = createContext<User | null>(null)
 
@@ -16,6 +17,11 @@ export function Auth(props: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function fetchData() {
+      const project = getCurrentProject()
+      if (!project) {
+        router.push('/choose-project')
+        return
+      }
       const userToken = localStorage.getItem(TOKEN_NAME)
       if (!userToken) {
         router.push('/login')

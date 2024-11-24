@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export function NavPages() {
   return (
-    <div className='navbar-center lg:flex'>
+    <div className='navbar-center lg:flex z-10'>
       <ul className='menu menu-horizontal px-1 text-lg'>
         <li>
           <details>

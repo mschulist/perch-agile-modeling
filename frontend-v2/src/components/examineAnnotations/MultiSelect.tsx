@@ -20,7 +20,13 @@ interface MultiSelectProps {
   required?: boolean
 }
 
-export function MultiSelect({ options, setLabels, labels, placeholder, required }: MultiSelectProps) {
+export function MultiSelect({
+  options,
+  setLabels,
+  labels,
+  placeholder,
+  required,
+}: MultiSelectProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>(labels)
@@ -44,12 +50,13 @@ export function MultiSelect({ options, setLabels, labels, placeholder, required 
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       const input = inputRef.current
       if (input) {
-        if (e.key === 'Enter' && inputValue) {
-          if (!selected.includes(inputValue)) {
+        if (e.key === 'Enter') {
+          // Let the CommandItem handle selection when open
+          if (!open && inputValue && !selected.includes(inputValue)) {
             setSelected((prev) => [...prev, inputValue])
             setInputValue('')
+            e.preventDefault()
           }
-          e.preventDefault()
         } else if (
           (e.key === 'Delete' || e.key === 'Backspace') &&
           input.value === ''
@@ -64,7 +71,7 @@ export function MultiSelect({ options, setLabels, labels, placeholder, required 
         }
       }
     },
-    [inputValue, selected]
+    [inputValue, selected, open]
   )
 
   const filteredOptions = options.filter(
@@ -88,7 +95,7 @@ export function MultiSelect({ options, setLabels, labels, placeholder, required 
                 className='rounded-lg py-3 text-lg bg-neutral w-fit'
               >
                 {value}
-                {(selected.length > 1 || !requireAtLeastOne)&& (
+                {(selected.length > 1 || !requireAtLeastOne) && (
                   <button
                     className='rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-1'
                     onKeyDown={(e) => {
@@ -139,23 +146,25 @@ export function MultiSelect({ options, setLabels, labels, placeholder, required 
                   {option}
                 </CommandItem>
               ))}
-              {filteredOptions.length === 0 && inputValue && (
-                <CommandItem
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onSelect={() => {
-                    if (!selected.includes(inputValue) && inputValue) {
+              {/* TODO: there is a bug when we try to type something that 
+              has a first common string with an already selected option */}
+              {inputValue &&
+                !options.includes(inputValue) &&
+                !selected.includes(inputValue) && (
+                  <CommandItem
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onSelect={() => {
                       setSelected((prev) => [...prev, inputValue])
                       setInputValue('')
-                    }
-                  }}
-                  className='cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground'
-                >
-                  Add "{inputValue}"
-                </CommandItem>
-              )}
+                    }}
+                    className='cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground text-base'
+                  >
+                    Add "{inputValue}"
+                  </CommandItem>
+                )}
             </CommandGroup>
           </CommandList>
         </div>

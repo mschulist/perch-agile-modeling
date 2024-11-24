@@ -29,7 +29,7 @@ export function AnnotateRecordings() {
   }, [])
 
   return (
-    <div className='flex flex-col items-center w-full p-8'>
+    <div className='flex flex-col items-center w-full pt-16'>
       {possibleExample && (
         <div className='card bg-base-300 shadow-xl w-1/2 max-w-xl'>
           <div className='card-body'>
@@ -45,8 +45,8 @@ export function AnnotateRecordings() {
             <figure className='mt-4'>
               <Image
                 src={getUrl(possibleExample.image_path)}
-                width={350}
-                height={300}
+                width={500}
+                height={600}
                 alt='annotation'
                 className='rounded-lg'
               />

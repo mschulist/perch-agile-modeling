@@ -10,5 +10,5 @@ def get_all_species_codes() -> List[str]:
         raise ValueError("Mapping not found. This error should never happen:/")
 
     reversed_mapping = {v: k for k, v in mapping.mapped_pairs.items()}
-    
+
     return list(reversed_mapping.keys())

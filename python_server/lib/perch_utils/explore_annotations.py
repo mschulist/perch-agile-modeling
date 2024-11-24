@@ -87,7 +87,9 @@ class ExploreAnnotations:
         for label in labels:
             labels_list.append(label.label)
 
-        possible_example = self.db.get_possible_example_by_embed_id(embedding_id, self.project_id)
+        possible_example = self.db.get_possible_example_by_embed_id(
+            embedding_id, self.project_id
+        )
         if possible_example is None or possible_example.id is None:
             return None
 

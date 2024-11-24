@@ -50,11 +50,11 @@ export function getCurrentProject(): Project | null {
   return project ? JSON.parse(project) : null
 }
 
-function setProject(project: Project) {
+export function setProject(project: Project) {
   localStorage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project))
 }
 
-async function fetchProjects() {
+export async function fetchProjects() {
   const response = await getServerRequest('my_projects')
   if (response.ok) {
     return response.json()
