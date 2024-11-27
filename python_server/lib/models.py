@@ -31,6 +31,15 @@ class User(SQLModel, table=True):
     )
 
 
+class UserResponse(BaseModel):
+    """
+    We do not return the hashed password in the response.
+    """
+
+    name: str
+    email: str
+
+
 class Project(SQLModel, table=True):
     __tablename__ = "projects"  # type: ignore
 
@@ -198,3 +207,15 @@ class AnnotatedRecording(BaseModel):
     embedding_id: int
     image_path: str
     audio_path: str
+
+
+class RecordingsSummary(BaseModel):
+    """
+    Summary of the recordings for a project.
+    """
+
+    num_finished_possible_examples: int
+    num_labels: int
+    num_embeddings: int
+    num_source_files: int
+    hours_recordings: float
