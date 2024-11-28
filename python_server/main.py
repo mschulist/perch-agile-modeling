@@ -1,6 +1,6 @@
 from datetime import timedelta
 from typing import Annotated, List
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -220,26 +220,31 @@ async def gather_possible_examples(
     call_types: List[str],
     num_examples_per_target: int,
     num_targets: int,
+    background_tasks: BackgroundTasks,
 ):
     project = db.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    # TODO: fix the allowed users
     allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = get_hoplite_db(project_id)
-    gatherer = GatherPossibleExamples(
-        db=db,
-        hoplite_db=hoplite_db,
-        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
-        target_path=TARGET_EXAMPLES_DIR,
-        project_id=project_id,
-    )
-    gatherer.get_possible_examples(
-        species_codes, call_types, num_examples_per_target, num_targets
-    )
+    def gather_examples():
+        hoplite_db = load_hoplite_db(project_id)
+        accounts_db = AccountsDB()
+        gatherer = GatherPossibleExamples(
+            db=accounts_db,
+            hoplite_db=hoplite_db,
+            precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
+            target_path=TARGET_EXAMPLES_DIR,
+            project_id=project_id,
+        )
+        gatherer.get_possible_examples(
+            species_codes, call_types, num_examples_per_target, num_targets
+        )
+        print("Finished gathering examples")
+
+    background_tasks.add_task(gather_examples)
     return {"message": "Started to gather target recordings", "success": True}
 
 

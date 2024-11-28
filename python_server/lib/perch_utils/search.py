@@ -121,8 +121,13 @@ class GatherPossibleExamples:
 
             # 3. Save the possible examples to the precompute search directory
             for close_result in close_results:
+                embed_id = int.from_bytes(close_result.key, "little")  # type: ignore
+                if self.db.get_possible_example_by_embed_id(embed_id, self.project_id):
+                    # skip if we already have this example
+                    print(f"Skipping example {embed_id} as it already exists.")
+                    continue
                 self.save_search_result(
-                    close_result.key, close_result.distance, target_recording
+                    embed_id, close_result.distance, target_recording
                 )
 
             # finish the targer recording: ie we have searched for all possible examples
@@ -178,11 +183,8 @@ class GatherPossibleExamples:
             target_recording: Target recording that the search result is associated with.
         """
         # insert into database
-        embed_id = int.from_bytes(embedding_id, "little")  # type: ignore
 
-        target_recording = self.db.session.merge(target_recording)
-
-        source = self.hoplite_db.get_embedding_source(embed_id)
+        source = self.hoplite_db.get_embedding_source(embedding_id)
         possible_example = PossibleExample(
             project_id=self.project_id,
             score=score,
@@ -190,7 +192,7 @@ class GatherPossibleExamples:
             filename=source.source_id,
             target_recording_id=target_recording.id,
             target_recording=target_recording,
-            embedding_id=embed_id,
+            embedding_id=embedding_id,
         )
 
         possible_example_id = self.db.add_possible_example(possible_example)
