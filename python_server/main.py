@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from python_server.lib.all_species_codes import get_all_species_codes
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
+from python_server.lib.perch_utils.classify import ClassifyFromLabels
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
 from python_server.lib.perch_utils.search import GatherPossibleExamples
@@ -41,6 +42,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 180
 
 PRECOMPUTE_SEARCH_DIR = "data/precompute_search"
 TARGET_EXAMPLES_DIR = "data/target_examples"
+WAREHOUSE_PATH = "data/warehouse"
+CLASSIFIER_PARAMS_PATH = "data/classifier_params"
 
 
 app = FastAPI()
@@ -54,7 +57,7 @@ app.add_middleware(
 )
 
 db = AccountsDB()
-
+db.create_db_and_tables()
 projects = db.get_all_projects()
 
 hoplite_dbs = {}
@@ -321,7 +324,7 @@ async def get_annotations_by_label(
 
     explore = ExploreAnnotations(
         db=db,
-        hoplite_db=hoplite_db,  # type: ignore
+        hoplite_db=hoplite_db,
         precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
         project_id=project_id,
         provenance=current_user.name,
@@ -410,3 +413,34 @@ async def recordings_summary(
     summary = get_summary(project_id, db, get_hoplite_db(project_id))
     print(summary)
     return summary
+
+
+@app.post("/classify")
+async def classify_recordings(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    background_tasks: BackgroundTasks,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    def classify_worker():
+        hoplite_db = load_hoplite_db(project_id)
+        accounts_db = AccountsDB()
+        classifier = ClassifyFromLabels(
+            db=accounts_db,
+            hoplite_db=hoplite_db,
+            project_id=project_id,
+            warehouse_path=WAREHOUSE_PATH,
+            classifier_params_path=CLASSIFIER_PARAMS_PATH,
+        )
+        ice_table = classifier.create_iceberg_table()
+        classifier.threaded_classify(ice_table)
+        print("Finished classifying")
+
+    background_tasks.add_task(classify_worker)
+    return {"message": "Started to classify recordings", "success": True}

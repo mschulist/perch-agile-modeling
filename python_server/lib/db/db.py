@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, create_engine, Session, not_, select, col
 from typing import Optional, Sequence
 from python_server.lib.models import (
+    ClassifierRun,
     FinishedTargetRecording,
     PossibleExample,
     Project,
@@ -250,3 +251,14 @@ class AccountsDB:
             )
             possible_example = session.exec(statement).first()
             return possible_example
+
+    def add_classifier(self, classifier: ClassifierRun):
+        """
+        Adds a classifier run to the database.
+
+        Args:
+            classifier: The classifier run to add to the database.
+        """
+        with Session(self.engine) as session:
+            session.add(classifier)
+            session.commit()
