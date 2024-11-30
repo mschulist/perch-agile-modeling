@@ -213,9 +213,7 @@ class ClassifierResult(SQLModel, table=True):
     embedding_id: int = Field(index=True)
     label: str = Field(index=True)
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
-    classifier_run_id: Optional[int] = Field(
-        default=None, foreign_key="classifier_runs.id"
-    )
+    classifier_run_id: int = Field(foreign_key="classifier_runs.id")
 
     project: Optional[Project] = Relationship(back_populates="classifier_results")
     classifier_run: Optional[ClassifierRun] = Relationship(

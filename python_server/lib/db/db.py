@@ -1,6 +1,7 @@
-from sqlmodel import SQLModel, create_engine, Session, not_, select, col
+from sqlmodel import SQLModel, and_, create_engine, Session, not_, select, col
 from typing import Optional, Sequence
 from python_server.lib.models import (
+    ClassifierResult,
     ClassifierRun,
     FinishedTargetRecording,
     PossibleExample,
@@ -246,8 +247,10 @@ class AccountsDB:
 
         with Session(self.engine) as session:
             statement = select(PossibleExample).where(
-                PossibleExample.embedding_id == int(embedding_id)
-                and PossibleExample.project_id == project_id
+                and_(
+                    PossibleExample.embedding_id == int(embedding_id),
+                    PossibleExample.project_id == project_id,
+                )
             )
             possible_example = session.exec(statement).first()
             return possible_example
@@ -262,3 +265,50 @@ class AccountsDB:
         with Session(self.engine) as session:
             session.add(classifier)
             session.commit()
+
+    def add_classifier_result(self, classifier_result: ClassifierResult):
+        """
+        Adds a classifier result to the database.
+
+        Args:
+            classifier_result: The classifier result to add to the database.
+        """
+        with Session(self.engine) as session:
+            session.add(classifier_result)
+            session.commit()
+
+    def get_classifier_result_by_embed_id_and_label(
+        self, embed_id: int, label: str
+    ) -> Optional[ClassifierResult]:
+        """
+        Given an embedding id and label from the hoplite db, get the classifier result from the accounts db.
+        """
+
+        with Session(self.engine) as session:
+            statement = select(ClassifierResult).where(
+                and_(
+                    ClassifierResult.embedding_id == int(embed_id),
+                    ClassifierResult.label == label,
+                )
+            )
+            classifier_result = session.exec(statement).first()
+            return classifier_result
+
+    def get_classifier_run_id_by_datetime(
+        self, datetime: str, project_id: int
+    ) -> Optional[int]:
+        """
+        Given a datetime and project id, get the classifier run id.
+        """
+
+        with Session(self.engine) as session:
+            statement = select(ClassifierRun).where(
+                and_(
+                    ClassifierRun.datetime == datetime,
+                    ClassifierRun.project_id == project_id,
+                )
+            )
+            classifier_run = session.exec(statement).first()
+            if classifier_run is None:
+                return None
+            return classifier_run.id

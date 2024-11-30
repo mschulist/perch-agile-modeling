@@ -1,12 +1,15 @@
 from datetime import timedelta
-from typing import Annotated, List
+from typing import Annotated, List, Optional, Tuple
 from fastapi import Depends, FastAPI, HTTPException, Response, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from python_server.lib.all_species_codes import get_all_species_codes
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
-from python_server.lib.perch_utils.classify import ClassifyFromLabels
+from python_server.lib.perch_utils.classify import (
+    ClassifyFromLabels,
+    ExamineClassifications,
+)
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
 from python_server.lib.perch_utils.search import GatherPossibleExamples
@@ -44,7 +47,7 @@ PRECOMPUTE_SEARCH_DIR = "data/precompute_search"
 TARGET_EXAMPLES_DIR = "data/target_examples"
 WAREHOUSE_PATH = "data/warehouse"
 CLASSIFIER_PARAMS_PATH = "data/classifier_params"
-
+PRECOMPUTE_CLASSIFY_PATH = "data/precompute_classify"
 
 app = FastAPI()
 
@@ -439,8 +442,57 @@ async def classify_recordings(
             classifier_params_path=CLASSIFIER_PARAMS_PATH,
         )
         ice_table = classifier.create_iceberg_table()
-        classifier.threaded_classify(ice_table)
+        classifier.threaded_classify(
+            ice_table, batch_size=4096, max_workers=12, table_size=1_000_000
+        )
         print("Finished classifying")
 
     background_tasks.add_task(classify_worker)
     return {"message": "Started to classify recordings", "success": True}
+
+
+@app.post("/search_classified")
+async def search_classified_recordings(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    logit_ranges: Tuple[Tuple[int, int], ...],
+    num_per_range: int,
+    classified_datetime: str,
+    background_tasks: BackgroundTasks,
+    labels: Optional[List[str]] = None,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # check to make sure that logit_ranges is a list of lists of length 2
+    for logit_range in logit_ranges:
+        if len(logit_range) != 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Logit ranges must be a list of lists of length 2",
+            )
+
+    def search_worker():
+        hoplite_db = load_hoplite_db(project_id)
+        accounts_db = AccountsDB()
+        examine_classified = ExamineClassifications(
+            db=accounts_db,
+            hoplite_db=hoplite_db,
+            classify_datetime=classified_datetime,
+            project_id=project_id,
+            warehouse_path=WAREHOUSE_PATH,
+            precompute_classify_path=PRECOMPUTE_CLASSIFY_PATH,
+        )
+        examine_classified.precompute_classify_results(
+            logit_ranges=logit_ranges,
+            labels=labels,
+            num_per_label=num_per_range,
+        )
+        print("Finished searching")
+
+    background_tasks.add_task(search_worker)
+    return {"message": "Started to search classified recordings", "success": True}
