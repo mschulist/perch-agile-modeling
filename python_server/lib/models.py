@@ -62,6 +62,13 @@ class Project(SQLModel, table=True):
         back_populates="project"
     )
     possible_examples: List["PossibleExample"] = Relationship(back_populates="project")
+    classifier_results: List["ClassifierResult"] = Relationship(
+        back_populates="project"
+    )
+    classifier_runs: List["ClassifierRun"] = Relationship(back_populates="project")
+    finished_classifier_results: List["FinishedClassifierResult"] = Relationship(
+        back_populates="project"
+    )
 
 
 class TargetRecording(SQLModel, table=True):
@@ -163,6 +170,78 @@ class FinishedPossibleExample(SQLModel, table=True):
     )
     project: Optional[Project] = Relationship(
         back_populates="finished_possible_examples"
+    )
+
+
+class ClassifierRun(SQLModel, table=True):
+    """
+    Table to store the metadata of classifier runs from all projects.
+    """
+
+    __tablename__ = "classifier_runs"  # type: ignore
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
+
+    datetime: str = Field(index=True)
+
+    project: Optional[Project] = Relationship(back_populates="classifier_runs")
+    classifier_results: List["ClassifierResult"] = Relationship(
+        back_populates="classifier_run"
+    )
+
+
+class ClassifierResult(SQLModel, table=True):
+    """
+    Table to store "some" results from classifier runs.
+
+    This is meant to be similar to the possible examples, except
+    now we are using the classifier to predict the species of the recordings
+    instead of using ANN from the embeddings.
+
+    This will contain a small subset of the classifier results, just a few
+    per label so that we can see how well the classifier is doing and label
+    examples as we do so.
+    """
+
+    __tablename__ = "classifier_results"  # type: ignore
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    filename: str = Field(index=True)
+    timestamp_s: float = Field(index=True)
+    logit: float = Field(index=True)
+    embedding_id: int = Field(index=True)
+    label: str = Field(index=True)
+    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
+    classifier_run_id: int = Field(foreign_key="classifier_runs.id")
+
+    project: Optional[Project] = Relationship(back_populates="classifier_results")
+    classifier_run: Optional[ClassifierRun] = Relationship(
+        back_populates="classifier_results"
+    )
+    finished_classifier_results: List["FinishedClassifierResult"] = Relationship(
+        back_populates="classifier_result"
+    )
+
+
+class FinishedClassifierResult(SQLModel, table=True):
+    """
+    Table to store all of the classifier results that have already been labeled by humans.
+    """
+
+    __tablename__ = "finished_classifier_results"  # type: ignore
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    classifier_result_id: Optional[int] = Field(
+        default=None, foreign_key="classifier_results.id"
+    )
+    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
+
+    classifier_result: Optional[ClassifierResult] = Relationship(
+        back_populates="finished_classifier_results"
+    )
+    project: Optional[Project] = Relationship(
+        back_populates="finished_classifier_results"
     )
 
 

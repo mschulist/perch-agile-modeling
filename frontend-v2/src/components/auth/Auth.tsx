@@ -17,11 +17,6 @@ export function Auth(props: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function fetchData() {
-      const project = getCurrentProject()
-      if (!project) {
-        router.push('/choose-project')
-        return
-      }
       const userToken = localStorage.getItem(TOKEN_NAME)
       if (!userToken) {
         router.push('/login')
@@ -30,6 +25,11 @@ export function Auth(props: { children: React.ReactNode }) {
       const response = await getCurrentUser()
       if (response.status === 401) {
         router.push('/login')
+        return
+      }
+      const project = getCurrentProject()
+      if (!project) {
+        router.push('/choose-project')
         return
       }
       const user = await response.json()
