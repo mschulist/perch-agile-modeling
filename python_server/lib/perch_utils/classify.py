@@ -51,11 +51,10 @@ class ClassifyFromLabels:
 
         self.datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        self.data_manager = self.get_data_manager()
         # TODO: maybe make this a parameter...
-        self.labels = [
-            x for x in self.data_manager.get_target_labels() if x != "review"
-        ]
+        self.labels = tuple([x for x in self.hoplite_db.get_classes() if x != "review"])
+
+        self.data_manager = self.get_data_manager()
 
         if params is None:
             self.params, self.eval_scores = self.train_classifier(self.data_manager)
@@ -66,7 +65,7 @@ class ClassifyFromLabels:
         """
 
         return classifier_data.AgileDataManager(
-            target_labels=None,
+            target_labels=self.labels,
             db=self.hoplite_db,
             train_ratio=0.9,
             min_eval_examples=1,

@@ -443,7 +443,7 @@ async def classify_recordings(
         )
         ice_table = classifier.create_iceberg_table()
         classifier.threaded_classify(
-            ice_table, batch_size=4096, max_workers=12, table_size=1_000_000
+            ice_table, batch_size=8192, max_workers=12, table_size=500_000_000
         )
         print("Finished classifying")
 
