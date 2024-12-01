@@ -312,3 +312,28 @@ class AccountsDB:
             if classifier_run is None:
                 return None
             return classifier_run.id
+
+    def get_classifier_runs(self, project_id: int):
+        """
+        Get the classifier runs for the given project.
+        """
+        with Session(self.engine) as session:
+            statement = select(ClassifierRun).where(
+                ClassifierRun.project_id == project_id
+            )
+            classifier_runs = session.exec(statement).all()
+            return classifier_runs
+
+    def get_classifier_results(self, classifier_run_id: int, project_id: int):
+        """
+        Get the classifier results for the given classifier run and project.
+        """
+        with Session(self.engine) as session:
+            statement = select(ClassifierResult).where(
+                and_(
+                    ClassifierResult.classifier_run_id == classifier_run_id,
+                    ClassifierResult.project_id == project_id,
+                )
+            )
+            classifier_results = session.exec(statement).all()
+            return classifier_results

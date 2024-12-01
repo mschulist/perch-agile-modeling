@@ -245,6 +245,19 @@ class FinishedClassifierResult(SQLModel, table=True):
     )
 
 
+class ClassifierResultResponse(BaseModel):
+    id: int
+    filename: str
+    timestamp_s: float
+    logit: float
+    embedding_id: int
+    label: str
+    project_id: int
+    classifier_run_id: int
+    image_path: str
+    audio_path: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str

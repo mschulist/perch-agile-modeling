@@ -3,6 +3,7 @@ from typing import Annotated, List, Optional, Tuple
 from fastapi import Depends, FastAPI, HTTPException, Response, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from etils import epath
 
 from python_server.lib.all_species_codes import get_all_species_codes
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
@@ -12,7 +13,11 @@ from python_server.lib.perch_utils.classify import (
 )
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
-from python_server.lib.perch_utils.search import GatherPossibleExamples
+from python_server.lib.perch_utils.search import (
+    GatherPossibleExamples,
+    get_possible_example_audio_path,
+    get_possible_example_image_path,
+)
 from python_server.lib.perch_utils.summary import get_summary
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
@@ -28,6 +33,7 @@ from .lib.auth import (
 )
 from .lib.models import (
     AnnotatedRecording,
+    ClassifierResultResponse,
     PossibleExampleResponse,
     Project,
     RecordingsSummary,
@@ -496,3 +502,70 @@ async def search_classified_recordings(
 
     background_tasks.add_task(search_worker)
     return {"message": "Started to search classified recordings", "success": True}
+
+
+@app.get("/get_classifier_runs")
+async def get_run_classifiers(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    runs = db.get_classifier_runs(project_id)
+    if len(runs) == 0:
+        return {"message": "No classifier runs found"}
+    return runs
+
+
+@app.get("/get_classifier_results")
+async def get_classifier_results(
+    current_user: Annotated[User, Depends(get_current_user)],
+    project_id: int,
+    classifier_run_id: int,
+):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    allowed_users = [project.owner_id]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    results = db.get_classifier_results(classifier_run_id, project_id)
+    if len(results) == 0:
+        return {"message": "No classifier results found"}
+
+    classifier_results: List[ClassifierResultResponse] = []
+    for result in results:
+        if result.id is None:
+            raise HTTPException(status_code=500, detail="ID is None")
+        if result.project_id is None:
+            raise HTTPException(status_code=500, detail="Project ID is None")
+
+        classifier_results.append(
+            ClassifierResultResponse(
+                id=result.id,
+                embedding_id=result.embedding_id,
+                label=result.label,
+                logit=result.logit,
+                timestamp_s=result.timestamp_s,
+                filename=result.filename,
+                project_id=result.project_id,
+                classifier_run_id=result.classifier_run_id,
+                image_path=str(
+                    get_possible_example_image_path(
+                        result.id, epath.Path(PRECOMPUTE_CLASSIFY_PATH)
+                    )
+                ),
+                audio_path=str(
+                    get_possible_example_audio_path(
+                        result.id, epath.Path(PRECOMPUTE_CLASSIFY_PATH)
+                    )
+                ),
+            )
+        )
+    return results
