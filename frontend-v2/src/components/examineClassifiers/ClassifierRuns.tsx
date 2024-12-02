@@ -29,23 +29,24 @@ export function ClassifierRuns() {
   }
 
   return (
-    <div className='flex justify-center items-center'>
+    <div className='flex justify-evenly items-center'>
       <div className='flex flex-col'>
-        {/* TODO: make this button have a modal to make sure that the user wants to make classifier */}
         <button
           className='btn btn-primary p-2 m-4'
-          onClick={async () => {
-            const mess = await runClassifier()
-            if (mess) {
-              setMessage(mess)
-            }
+          onClick={() => {
+            ;(
+              document.getElementById('my_modal_1') as HTMLDialogElement
+            )?.showModal()
           }}
         >
           Make New Classifier
         </button>
         {message && <div className='text-green-400'> {message} </div>}
         {classifierRuns.map((run, i) => (
-          <div key={i}>
+          <div
+            key={i}
+            className='m-2 transition-transform duration-200 ease-in-out transform hover:scale-110 hover:text-blue-500'
+          >
             <button onClick={() => setFocusedRun(run)}>
               Date of Classifier: {run.datetime}
             </button>
@@ -53,6 +54,33 @@ export function ClassifierRuns() {
         ))}
       </div>
       {focusedRun && <SingleClassifyRun classifyRun={focusedRun} />}
+      <dialog id='my_modal_1' className='modal'>
+        <div className='modal-box'>
+          <h3 className='font-bold text-lg'>Confirm Action</h3>
+          <p className='py-4'>
+            Are you sure you want to create a new classifier?
+          </p>
+          <div className='modal-action'>
+            <form method='dialog'>
+              <button className='btn'>Cancel</button>
+            </form>
+            <button
+              className='btn btn-primary'
+              onClick={async () => {
+                const mess = await runClassifier()
+                if (mess) {
+                  setMessage(mess)
+                }
+                ;(
+                  document.getElementById('my_modal_1') as HTMLDialogElement
+                )?.close()
+              }}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   )
 }
@@ -70,7 +98,7 @@ export async function fetchClassifierRuns() {
     if (response.message) {
       return []
     }
-    return (await res.json()) as ClassifyRun[]
+    return response as ClassifyRun[]
   }
   throw new Error('Failed to get classifier runs')
 }

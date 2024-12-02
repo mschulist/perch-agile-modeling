@@ -39,7 +39,7 @@ def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
     """
     if str(params_path).startswith("gs://"):
         return get_temp_gs_url(f"{str(params_path)}/{run_id}.json")
-    return epath.Path(params_path) / f"{run_id}.png"
+    return epath.Path(params_path) / f"{run_id}_eval_scores.npz"
 
 
 def worker_initializer(state: dict[str, Any]):

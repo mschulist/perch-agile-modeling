@@ -26,6 +26,7 @@ from .lib.perch_utils.projects import load_hoplite_db, setup_hoplite_db
 
 from .lib.auth import (
     authenticate_user,
+    convert_eval_metrics_to_json,
     create_access_token,
     get_current_user,
     get_db,
@@ -526,7 +527,10 @@ async def get_run_classifiers(
     for run in runs:
         if run.id is None:
             raise HTTPException(status_code=400)
-        eval_metrics = np.load(get_eval_metrics_path(CLASSIFIER_PARAMS_PATH, run.id))
+        eval_metrics_npz = np.load(
+            get_eval_metrics_path(CLASSIFIER_PARAMS_PATH, run.id)
+        )
+        eval_metrics = convert_eval_metrics_to_json(eval_metrics_npz)
         runs_response.append(
             ClassifierRunResponse(
                 id=run.id,
@@ -535,7 +539,7 @@ async def get_run_classifiers(
                 eval_metrics=eval_metrics,
             )
         )
-    return runs
+    return runs_response
 
 
 @app.get("/get_classifier_results")

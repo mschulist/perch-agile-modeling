@@ -31,9 +31,6 @@ export type EvalMetrics = {
   roc_auc_individual: number[]
   cmap: number
   cmap_individual: number[]
-  eval_ids: number[]
-  eval_preds: number[]
-  eval_labels: number[]
 }
 
 export type ClassifiedResult = {

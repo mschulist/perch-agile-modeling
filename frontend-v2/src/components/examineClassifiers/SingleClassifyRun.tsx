@@ -7,27 +7,13 @@ export function SingleClassifyRun({
 }) {
   const metrics = classifyRun.eval_metrics
   return (
-    <div className='flex flex-col justify-center items-center'>
+    <div className='flex flex-col justify-center'>
+      <h2 className='text-xl font-bold mb-4'>
+        Classifier Run: {classifyRun.datetime}
+      </h2>
       <div>Top 1 Accuracy: {metrics.top1_acc}</div>
       <div>ROC AUC: {metrics.roc_auc}</div>
       <div>CMAP: {metrics.cmap}</div>
-      {/* TODO: Make these collapsible */}
-      <div>
-        ROC AUC by label
-        {metrics.roc_auc_individual.map((rocauc, i) => (
-          <div key={i}>
-            {metrics.eval_labels[i]}: {rocauc}
-          </div>
-        ))}
-      </div>
-      <div>
-        CMAP by label
-        {metrics.cmap_individual.map((cmap, i) => (
-          <div key={i}>
-            {metrics.eval_labels[i]}: {cmap}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
