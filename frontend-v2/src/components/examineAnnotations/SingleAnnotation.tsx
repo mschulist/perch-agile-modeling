@@ -96,7 +96,7 @@ export function SingleAnnotation({
   )
 }
 
-async function postNewLabels(embedding_id: number, labels: string[]) {
+export async function postNewLabels(embedding_id: number, labels: string[]) {
   console.log('posting new labels', embedding_id, labels)
   const projectId = getCurrentProject()?.id
   if (!projectId) {

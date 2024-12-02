@@ -89,6 +89,7 @@ export function Search() {
         <div className='flex flex-col items-center gap-2'>
           <p className='text-lg'>Number of examples per target:</p>
           <input
+            aria-label='numExPerTarget'
             type='number'
             value={numExPerTarget}
             onChange={(e) => {
@@ -101,6 +102,7 @@ export function Search() {
         <div className='flex flex-col items-center gap-2'>
           <p className='text-lg'>Number of Targets:</p>
           <input
+            aria-label='numTargets'
             type='number'
             value={numTargets}
             onChange={(e) => {

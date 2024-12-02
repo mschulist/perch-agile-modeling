@@ -26,6 +26,21 @@ export function NavPages() {
         <li>
           <Link href='/summary'>Summary</Link>
         </li>
+        <li>
+          <details>
+            <summary>Classify</summary>
+            <ul className='p-2'>
+              <li>
+                <Link href='/classify/classify-runs'>Classifier Runs</Link>
+              </li>
+              <li>
+                <Link href='/classify/classify-results'>
+                  Classifier Results
+                </Link>
+              </li>
+            </ul>
+          </details>
+        </li>
       </ul>
     </div>
   )

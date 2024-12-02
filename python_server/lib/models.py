@@ -181,8 +181,7 @@ class ClassifierRun(SQLModel, table=True):
     __tablename__ = "classifier_runs"  # type: ignore
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
-
+    project_id: int = Field(foreign_key="projects.id")
     datetime: str = Field(index=True)
 
     project: Optional[Project] = Relationship(back_populates="classifier_runs")
@@ -232,10 +231,8 @@ class FinishedClassifierResult(SQLModel, table=True):
     __tablename__ = "finished_classifier_results"  # type: ignore
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    classifier_result_id: Optional[int] = Field(
-        default=None, foreign_key="classifier_results.id"
-    )
-    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
+    classifier_result_id: int = Field(foreign_key="classifier_results.id")
+    project_id: int = Field(foreign_key="projects.id")
 
     classifier_result: Optional[ClassifierResult] = Relationship(
         back_populates="finished_classifier_results"
@@ -256,6 +253,14 @@ class ClassifierResultResponse(BaseModel):
     classifier_run_id: int
     image_path: str
     audio_path: str
+    annotated_labels: List[str]
+
+
+class ClassifierRunResponse(BaseModel):
+    id: int
+    datetime: str
+    project_id: int
+    eval_metrics: dict
 
 
 class Token(BaseModel):

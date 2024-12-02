@@ -7,8 +7,13 @@ import numpy as np
 import pyiceberg.table
 from pyiceberg.catalog.sql import SqlCatalog
 from pyiceberg.expressions import LessThanOrEqual, And, GreaterThanOrEqual, EqualTo
+from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
-from python_server.lib.models import ClassifierResult, ClassifierRun
+from python_server.lib.models import (
+    ClassifierResult,
+    ClassifierResultResponse,
+    ClassifierRun,
+)
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
     get_possible_example_image_path,
@@ -26,6 +31,15 @@ from etils import epath
 from chirp.projects.agile2 import classifier_data, classifier, embedding_display
 from chirp.projects.hoplite import interface
 from chirp import audio_utils
+
+
+def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
+    """
+    Given run id, get the eval metrics path
+    """
+    if str(params_path).startswith("gs://"):
+        return get_temp_gs_url(f"{str(params_path)}/{run_id}.json")
+    return epath.Path(params_path) / f"{run_id}.png"
 
 
 def worker_initializer(state: dict[str, Any]):
@@ -97,9 +111,15 @@ class ClassifyFromLabels:
 
         self.db.add_classifier(classifier_run)
 
-        np.savez(self.classifier_params_path / f"{self.datetime}_params.npz", **params)
+        classifier_run_id = self.db.get_classifier_run_id_by_datetime(
+            self.datetime, self.project_id
+        )
+
         np.savez(
-            self.classifier_params_path / f"{self.datetime}_eval_scores.npz",
+            self.classifier_params_path / f"{classifier_run_id}_params.npz", **params
+        )
+        np.savez(
+            self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
             **eval_scores,
         )
 
@@ -228,9 +248,9 @@ class ClassifyFromLabels:
         return table
 
 
-class ExamineClassifications:
+class SearchClassifications:
     """
-    Class to examine the classification results
+    Class to search the classification results
 
     The goal is to get a subset of the classification results to examine
     and label
@@ -287,6 +307,7 @@ class ExamineClassifications:
         self,
         logit_ranges: Tuple[Tuple[int, int], ...],
         num_per_label: int,
+        max_logits: bool = False,
         labels: Optional[List[str]] = None,
     ):
         """
@@ -294,6 +315,7 @@ class ExamineClassifications:
 
         Args:
             num_per_label: number of samples per label to examine
+            max_logits: whether to take the maximum logits from each range
             labels: list of labels to examine. If None, all labels are examined
         """
         num_per_logit_range = num_per_label // len(logit_ranges)
@@ -310,6 +332,10 @@ class ExamineClassifications:
             )
             # lbs is a list of tuples, so we just want the first element
             labels = [lb[0] for lb in lbs]
+
+        # if we are getting the max logits from the range, scanning cannot do that
+        # so we need to get all of the records and then select the max "manually"
+        limit = num_per_logit_range if not max_logits else None
         for label in labels:
             for logit_range in logit_ranges:
                 start, end = logit_range
@@ -319,8 +345,14 @@ class ExamineClassifications:
                         LessThanOrEqual("logit", end),
                         EqualTo("label", label),
                     ),
-                    limit=num_per_logit_range,
+                    limit=limit,
                 ).to_pandas()
+                if max_logits:
+                    table = (
+                        table.sort_values(by="logit", ascending=False)
+                        .reset_index()
+                        .iloc[0:num_per_logit_range]
+                    )
                 for _, row in table.iterrows():
                     embedding_id = row["embedding_id"]
                     logit = row["logit"]
@@ -410,3 +442,61 @@ class ExamineClassifications:
         )
         plt.savefig(image_output_filepath)
         plt.close()
+
+
+class ExamineClassifications:
+    def __init__(
+        self,
+        db: AccountsDB,
+        hoplite_db: SQLiteUsearchDBExt,
+        project_id: int,
+        precompute_classify_path: str,
+        classifier_run_id: int,
+    ):
+        self.db = db
+        self.hoplite_db = hoplite_db
+        self.project_id = project_id
+        self.precompute_classify_path = epath.Path(precompute_classify_path)
+        self.classifier_run_id = classifier_run_id
+
+    def get_classifier_results(self):
+        """
+        Get all of the precomputed results from a single classifier
+        """
+        results = self.db.get_classifier_results(
+            self.classifier_run_id, self.project_id
+        )
+        classifier_results: List[ClassifierResultResponse] = []
+        for result in results:
+            if result.id is None:
+                raise ValueError("Result id is None")
+            if result.project_id is None:
+                raise ValueError("Result project id is None")
+
+            annotated_labels = [
+                label.label for label in self.hoplite_db.get_labels(result.embedding_id)
+            ]
+            classifier_results.append(
+                ClassifierResultResponse(
+                    annotated_labels=annotated_labels,
+                    id=result.id,
+                    embedding_id=result.embedding_id,
+                    label=result.label,
+                    logit=result.logit,
+                    timestamp_s=result.timestamp_s,
+                    filename=result.filename,
+                    project_id=result.project_id,
+                    classifier_run_id=result.classifier_run_id,
+                    image_path=str(
+                        get_possible_example_image_path(
+                            result.id, self.precompute_classify_path
+                        )
+                    ),
+                    audio_path=str(
+                        get_possible_example_audio_path(
+                            result.id, self.precompute_classify_path
+                        )
+                    ),
+                )
+            )
+        return classifier_results

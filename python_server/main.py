@@ -3,22 +3,22 @@ from typing import Annotated, List, Optional, Tuple
 from fastapi import Depends, FastAPI, HTTPException, Response, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from etils import epath
-
+import numpy as np
 from python_server.lib.all_species_codes import get_all_species_codes
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples
 from python_server.lib.perch_utils.classify import (
     ClassifyFromLabels,
     ExamineClassifications,
+    SearchClassifications,
+    get_eval_metrics_path,
 )
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
 from python_server.lib.perch_utils.search import (
     GatherPossibleExamples,
-    get_possible_example_audio_path,
-    get_possible_example_image_path,
 )
 from python_server.lib.perch_utils.summary import get_summary
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
 
@@ -33,7 +33,7 @@ from .lib.auth import (
 )
 from .lib.models import (
     AnnotatedRecording,
-    ClassifierResultResponse,
+    ClassifierRunResponse,
     PossibleExampleResponse,
     Project,
     RecordingsSummary,
@@ -69,7 +69,7 @@ db = AccountsDB()
 db.create_db_and_tables()
 projects = db.get_all_projects()
 
-hoplite_dbs = {}
+hoplite_dbs: dict[int, SQLiteUsearchDBExt] = {}
 
 for project in projects:
     if project.id is None:
@@ -363,7 +363,7 @@ async def relabel_example(
 
     explore = ExploreAnnotations(
         db=db,
-        hoplite_db=hoplite_db,  # type: ignore
+        hoplite_db=hoplite_db,
         precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
         project_id=project_id,
         provenance=current_user.name,
@@ -464,6 +464,7 @@ async def search_classified_recordings(
     logit_ranges: Tuple[Tuple[int, int], ...],
     num_per_range: int,
     classified_datetime: str,
+    max_logits: bool,
     background_tasks: BackgroundTasks,
     labels: Optional[List[str]] = None,
 ):
@@ -485,7 +486,7 @@ async def search_classified_recordings(
     def search_worker():
         hoplite_db = load_hoplite_db(project_id)
         accounts_db = AccountsDB()
-        examine_classified = ExamineClassifications(
+        examine_classified = SearchClassifications(
             db=accounts_db,
             hoplite_db=hoplite_db,
             classify_datetime=classified_datetime,
@@ -497,6 +498,7 @@ async def search_classified_recordings(
             logit_ranges=logit_ranges,
             labels=labels,
             num_per_label=num_per_range,
+            max_logits=max_logits,
         )
         print("Finished searching")
 
@@ -519,6 +521,20 @@ async def get_run_classifiers(
     runs = db.get_classifier_runs(project_id)
     if len(runs) == 0:
         return {"message": "No classifier runs found"}
+
+    runs_response: List[ClassifierRunResponse] = []
+    for run in runs:
+        if run.id is None:
+            raise HTTPException(status_code=400)
+        eval_metrics = np.load(get_eval_metrics_path(CLASSIFIER_PARAMS_PATH, run.id))
+        runs_response.append(
+            ClassifierRunResponse(
+                id=run.id,
+                datetime=run.datetime,
+                project_id=run.project_id,
+                eval_metrics=eval_metrics,
+            )
+        )
     return runs
 
 
@@ -535,37 +551,13 @@ async def get_classifier_results(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    results = db.get_classifier_results(classifier_run_id, project_id)
-    if len(results) == 0:
-        return {"message": "No classifier results found"}
+    hoplite_db = get_hoplite_db(project_id)
 
-    classifier_results: List[ClassifierResultResponse] = []
-    for result in results:
-        if result.id is None:
-            raise HTTPException(status_code=500, detail="ID is None")
-        if result.project_id is None:
-            raise HTTPException(status_code=500, detail="Project ID is None")
-
-        classifier_results.append(
-            ClassifierResultResponse(
-                id=result.id,
-                embedding_id=result.embedding_id,
-                label=result.label,
-                logit=result.logit,
-                timestamp_s=result.timestamp_s,
-                filename=result.filename,
-                project_id=result.project_id,
-                classifier_run_id=result.classifier_run_id,
-                image_path=str(
-                    get_possible_example_image_path(
-                        result.id, epath.Path(PRECOMPUTE_CLASSIFY_PATH)
-                    )
-                ),
-                audio_path=str(
-                    get_possible_example_audio_path(
-                        result.id, epath.Path(PRECOMPUTE_CLASSIFY_PATH)
-                    )
-                ),
-            )
-        )
-    return results
+    examine_classify = ExamineClassifications(
+        db=db,
+        hoplite_db=hoplite_db,
+        project_id=project_id,
+        precompute_classify_path=PRECOMPUTE_CLASSIFY_PATH,
+        classifier_run_id=classifier_run_id,
+    )
+    return examine_classify.get_classifier_results()
