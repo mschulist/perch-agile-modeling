@@ -337,3 +337,17 @@ class AccountsDB:
             )
             classifier_results = session.exec(statement).all()
             return classifier_results
+
+    def get_precompute_classify_embed_ids_by_label(self, label: str, project_id: int):
+        """
+        Get the embedding ids for the given label and project.
+        """
+        with Session(self.engine) as session:
+            statement = select(ClassifierResult.embedding_id).where(
+                and_(
+                    ClassifierResult.label == label,
+                    ClassifierResult.project_id == project_id,
+                )
+            )
+            embed_ids = session.exec(statement).all()
+            return embed_ids

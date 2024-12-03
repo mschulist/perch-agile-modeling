@@ -29,7 +29,7 @@ export function ClassifierRuns() {
   }
 
   return (
-    <div className='flex justify-evenly items-center'>
+    <div className='flex justify-evenly'>
       <div className='flex flex-col'>
         <button
           className='btn btn-primary p-2 m-4'

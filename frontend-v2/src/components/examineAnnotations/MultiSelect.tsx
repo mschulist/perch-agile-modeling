@@ -85,7 +85,7 @@ export function MultiSelect({
       onKeyDown={handleKeyDown}
       className='overflow-visible bg-transparent'
     >
-      <div className='group rounded-lg py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2'>
+      <div className='group rounded-lg text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2'>
         <div className='flex flex-col gap-2'>
           <div className='flex gap-1 flex-wrap'>
             {selected.map((value) => (

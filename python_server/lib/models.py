@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from sqlmodel import Field, SQLModel, Relationship
+from sqlmodel import Field, SQLModel, Relationship, UniqueConstraint
 
 
 class ProjectContributor(SQLModel, table=True):
@@ -204,6 +204,8 @@ class ClassifierResult(SQLModel, table=True):
     """
 
     __tablename__ = "classifier_results"  # type: ignore
+
+    __table_args__ = (UniqueConstraint("label", "embedding_id"),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     filename: str = Field(index=True)

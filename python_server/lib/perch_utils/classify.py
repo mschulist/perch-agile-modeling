@@ -6,7 +6,13 @@ import concurrent
 import numpy as np
 import pyiceberg.table
 from pyiceberg.catalog.sql import SqlCatalog
-from pyiceberg.expressions import LessThanOrEqual, And, GreaterThanOrEqual, EqualTo
+from pyiceberg.expressions import (
+    LessThanOrEqual,
+    And,
+    GreaterThanOrEqual,
+    EqualTo,
+    NotIn,
+)
 from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from python_server.lib.models import (
@@ -337,6 +343,12 @@ class SearchClassifications:
         # so we need to get all of the records and then select the max "manually"
         limit = num_per_logit_range if not max_logits else None
         for label in labels:
+            existing_embed_ids_for_label = (
+                self.db.get_precompute_classify_embed_ids_by_label(
+                    label,
+                    self.project_id,
+                )
+            )
             for logit_range in logit_ranges:
                 start, end = logit_range
                 table = self.iceberg_table.scan(
@@ -344,6 +356,7 @@ class SearchClassifications:
                         GreaterThanOrEqual("logit", start),
                         LessThanOrEqual("logit", end),
                         EqualTo("label", label),
+                        NotIn("embedding_id", existing_embed_ids_for_label),
                     ),
                     limit=limit,
                 ).to_pandas()
