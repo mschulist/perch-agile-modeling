@@ -1,7 +1,7 @@
 'use client'
 
 import { postServerRequest } from '@/networking/server_requests'
-import { use, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { getCurrentProject } from '../navigation/ProjectSelector'
 import { MultiSelect } from '../examineAnnotations/MultiSelect'
 import { LogitRangeSlider } from './LogitRangeSlider'
@@ -55,7 +55,7 @@ export function SearchClassifier(props: SearchClassifierProps) {
         />
       </div>
       <div className='flex flex-col'>
-        <label className='mb-1'>Num Per Range</label>
+        <label className='mb-1'>Number of Examples Per Range</label>
         <input
           type='number'
           value={numPerRange}
@@ -79,6 +79,7 @@ export function SearchClassifier(props: SearchClassifierProps) {
       <button className='btn btn-secondary' onClick={handleSearchButton}>
         Search Classifier
       </button>
+      {message && <div className='text-sm mt-2 text-green-500'>{message}</div>}
     </div>
   )
 }

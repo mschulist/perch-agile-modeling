@@ -5,6 +5,7 @@ import { SearchClassifier } from './SearchClassifier'
 import { use, useEffect, useState } from 'react'
 import { fetchAnnotationSummary } from '../examineAnnotations/ExamineAnnotations'
 import { getCurrentProject } from '../navigation/ProjectSelector'
+import { useRouter } from 'next/navigation'
 
 export function SingleClassifyRun({
   classifyRun,
@@ -13,6 +14,8 @@ export function SingleClassifyRun({
 }) {
   const [classifierLabels, setClassifierLabels] = useState<string[]>([])
   const metrics = classifyRun.eval_metrics
+
+  const router = useRouter()
 
   useEffect(() => {
     const projectId = getCurrentProject()?.id
@@ -24,6 +27,10 @@ export function SingleClassifyRun({
       })
     }
   }, [])
+
+  function handleExamineClassifierResults() {
+    router.push(`/classify/classify-results/${classifyRun.id}`)
+  }
 
   return (
     <div className='flex flex-col justify-center'>
@@ -39,6 +46,12 @@ export function SingleClassifyRun({
           classifierLabels={classifierLabels}
         />
       </div>
+      <button
+        className='mt-10 btn btn-accent'
+        onClick={handleExamineClassifierResults}
+      >
+        Examine Classifier Results
+      </button>
     </div>
   )
 }

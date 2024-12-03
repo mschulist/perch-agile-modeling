@@ -364,7 +364,7 @@ class SearchClassifications:
                     table = (
                         table.sort_values(by="logit", ascending=False)
                         .reset_index()
-                        .iloc[0:num_per_logit_range]
+                        .iloc[0 : min(num_per_logit_range, table.shape[0])]
                     )
                 for _, row in table.iterrows():
                     embedding_id = row["embedding_id"]
