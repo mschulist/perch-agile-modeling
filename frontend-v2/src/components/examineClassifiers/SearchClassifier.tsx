@@ -95,16 +95,33 @@ async function postSearchClassifier(
   if (!projectId) {
     throw new Error('Project ID not found')
   }
-  const res = await postServerRequest(
-    `search_classified?project_id=${projectId}&classified_datetime=${datetime}&max_logits=${maxLogit}&num_per_range=${numPerRange}`,
-    {
-      labels,
-      logit_ranges: logitRanges,
-    }
-  )
-  if (res.status === 200) {
-    const response = await res.json()
-    return response.message
+  if (logitRanges.length === 0) {
+    throw new Error('Logit ranges cannot be empty')
   }
-  throw new Error('Failed to search classifier')
+  if (labels.length !== 0) {
+    const res = await postServerRequest(
+      `search_classified?project_id=${projectId}&classified_datetime=${datetime}&max_logits=${maxLogit}&num_per_range=${numPerRange}`,
+      {
+        labels,
+        logit_ranges: logitRanges,
+      }
+    )
+    if (res.status === 200) {
+      const response = await res.json()
+      return response.message
+    }
+    throw new Error('Failed to search classifier')
+  } else {
+    const res = await postServerRequest(
+      `search_classified?project_id=${projectId}&classified_datetime=${datetime}&max_logits=${maxLogit}&num_per_range=${numPerRange}`,
+      {
+        logit_ranges: logitRanges,
+      }
+    )
+    if (res.status === 200) {
+      const response = await res.json()
+      return response.message
+    }
+    throw new Error('Failed to search classifier')
+  }
 }

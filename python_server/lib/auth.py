@@ -106,7 +106,7 @@ def convert_eval_metrics_to_json(eval_metrics: dict[str, Any]):
     Convert evaluation metrics to JSON format.
     """
     eval = {}
-    
+
     # these keys have very long arrays so we don't want to send them
     bad_keys = {"eval_ids", "eval_preds", "eval_labels"}
     for key, value in eval_metrics.items():

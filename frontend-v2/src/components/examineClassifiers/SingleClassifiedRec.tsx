@@ -8,11 +8,9 @@ import Image from 'next/image'
 export function SingleClassifiedRecording({
   classifiedResult,
   annotationSummary,
-  refreshAnnotationSummary,
 }: {
   classifiedResult: ClassifiedResult
   annotationSummary: Record<string, number>
-  refreshAnnotationSummary: () => void
 }) {
   const [annotatedLabels, setAnnotatedLabels] = useState(
     classifiedResult.annotated_labels
@@ -33,7 +31,6 @@ export function SingleClassifiedRecording({
     postNewLabels(classifiedResult.embedding_id, newAnnotatedLabels)
       .then(() => {
         setAnnotatedLabels(newAnnotatedLabels)
-        refreshAnnotationSummary()
       })
       .catch((e) => {
         console.error(e)

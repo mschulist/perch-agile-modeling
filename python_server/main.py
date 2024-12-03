@@ -220,7 +220,10 @@ async def get_next_possible_example(
 async def get_file(filename: str):
     # TODO: Check if the file is in the precompute search dir
     # for security reasons
-    if not filename.startswith(PRECOMPUTE_SEARCH_DIR):
+    if not (
+        filename.startswith(PRECOMPUTE_SEARCH_DIR)
+        or filename.startswith(PRECOMPUTE_CLASSIFY_PATH)
+    ):
         raise HTTPException(status_code=403, detail="Forbidden")
     return FileResponse(filename)
 
@@ -462,7 +465,7 @@ async def classify_recordings(
 async def search_classified_recordings(
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: int,
-    logit_ranges: Tuple[Tuple[int, int], ...],
+    logit_ranges: Tuple[Tuple[float, float], ...],
     num_per_range: int,
     classified_datetime: str,
     max_logits: bool,

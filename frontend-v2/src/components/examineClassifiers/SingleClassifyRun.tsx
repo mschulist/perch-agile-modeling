@@ -47,7 +47,7 @@ export function SingleClassifyRun({
         />
       </div>
       <button
-        className='mt-10 btn btn-accent'
+        className='my-10 btn btn-accent'
         onClick={handleExamineClassifierResults}
       >
         Examine Classifier Results

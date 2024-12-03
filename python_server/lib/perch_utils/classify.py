@@ -311,7 +311,7 @@ class SearchClassifications:
 
     def precompute_classify_results(
         self,
-        logit_ranges: Tuple[Tuple[int, int], ...],
+        logit_ranges: Tuple[Tuple[float, float], ...],
         num_per_label: int,
         max_logits: bool = False,
         labels: Optional[List[str]] = None,
