@@ -34,9 +34,9 @@ import pyarrow as pa
 from tqdm import tqdm
 from etils import epath
 
-from chirp.projects.agile2 import classifier_data, classifier, embedding_display
-from chirp.projects.hoplite import interface
-from chirp import audio_utils
+from hoplite.agile import classifier_data, classifier, embedding_display
+from hoplite.db import interface
+from hoplite import audio_io as audio_utils
 
 
 def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
@@ -44,8 +44,8 @@ def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
     Given run id, get the eval metrics path
     """
     if str(params_path).startswith("gs://"):
-        return get_temp_gs_url(f"{str(params_path)}/{run_id}.json")
-    return epath.Path(params_path) / f"{run_id}_eval_scores.npz"
+        return get_temp_gs_url(f"{str(params_path)}/{run_id}.npz")
+    return epath.Path(params_path) / f"{run_id}.npz"
 
 
 def worker_initializer(state: dict[str, Any]):
@@ -101,13 +101,11 @@ class ClassifyFromLabels:
         Adds the classifier to the database along with the evaluation scores
         """
 
-        params, eval_scores = classifier.train_linear_classifier(
+        linear_classifier, eval_scores = classifier.train_linear_classifier(
             data_manager=data_manager,
             learning_rate=1e-3,
             weak_neg_weight=0.05,
-            l2_mu=0.0,
             num_train_steps=128,
-            loss_name="bce",
         )
 
         classifier_run = ClassifierRun(
@@ -121,15 +119,15 @@ class ClassifyFromLabels:
             self.datetime, self.project_id
         )
 
-        np.savez(
-            self.classifier_params_path / f"{classifier_run_id}_params.npz", **params
+        linear_classifier.save(
+            str(self.classifier_params_path / f"{classifier_run_id}.json")
         )
         np.savez(
             self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
             **eval_scores,
         )
 
-        return params, eval_scores
+        return linear_classifier, eval_scores
 
     def classify_worker_function(self, embed_ids: np.ndarray, state: dict[str, Any]):
         """

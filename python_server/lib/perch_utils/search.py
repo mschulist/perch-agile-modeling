@@ -12,8 +12,7 @@ from etils import epath
 from chirp.projects.hoplite import sqlite_usearch_impl, interface
 from chirp.projects.zoo import model_configs
 from chirp.projects.agile2 import embedding_display
-from chirp import audio_utils
-
+import hoplite.audio_io as audio_utils
 
 from python_server.lib.models import PossibleExample, TargetRecording
 from python_server.lib.perch_utils.target_recordings import (

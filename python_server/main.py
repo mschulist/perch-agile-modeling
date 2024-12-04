@@ -20,6 +20,8 @@ from python_server.lib.perch_utils.search import (
 from python_server.lib.perch_utils.summary import get_summary
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 
+from hoplite.agile.classifier import LinearClassifier
+
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
 
 from .lib.perch_utils.projects import load_hoplite_db, setup_hoplite_db
@@ -534,6 +536,7 @@ async def get_run_classifiers(
             get_eval_metrics_path(CLASSIFIER_PARAMS_PATH, run.id)
         )
         eval_metrics = convert_eval_metrics_to_json(eval_metrics_npz)
+        classes = LinearClassifier.load()
         runs_response.append(
             ClassifierRunResponse(
                 id=run.id,

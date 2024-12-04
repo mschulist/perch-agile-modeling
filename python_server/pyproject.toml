@@ -1,0 +1,17 @@
+[project]
+name = "python-server"
+version = "0.1.0"
+description = "Server for Perch Agile Modeling"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bcrypt>=4.2.1",
+    "fastapi[standard]>=0.115.5",
+    "hoplite",
+    "pyiceberg>=0.8.0",
+    "pyjwt>=2.10.1",
+    "sqlmodel>=0.0.22",
+]
+
+[tool.uv.sources]
+hoplite = { git = "https://github.com/google-research/hoplite", rev = "7bc1eb5ad2f6f126d7d68bdc772da26586b7c12f" }
