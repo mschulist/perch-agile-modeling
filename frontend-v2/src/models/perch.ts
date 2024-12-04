@@ -23,6 +23,7 @@ export type ClassifyRun = {
   datetime: string
   project_id: number
   eval_metrics: EvalMetrics
+  classes: string[]
 }
 
 export type EvalMetrics = {

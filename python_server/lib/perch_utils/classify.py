@@ -44,8 +44,17 @@ def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
     Given run id, get the eval metrics path
     """
     if str(params_path).startswith("gs://"):
-        return get_temp_gs_url(f"{str(params_path)}/{run_id}.npz")
-    return epath.Path(params_path) / f"{run_id}.npz"
+        return get_temp_gs_url(f"{str(params_path)}/{run_id}_eval_scores.npz")
+    return epath.Path(params_path) / f"{run_id}_eval_scores.npz"
+
+
+def get_classifier_params_path(params_path: str | epath.Path, run_id: int):
+    """
+    Given run id, get the classifier params path
+    """
+    if str(params_path).startswith("gs://"):
+        return get_temp_gs_url(f"{str(params_path)}/{run_id}_params.json")
+    return epath.Path(params_path) / f"{run_id}_params.json"
 
 
 def worker_initializer(state: dict[str, Any]):
@@ -120,7 +129,7 @@ class ClassifyFromLabels:
         )
 
         linear_classifier.save(
-            str(self.classifier_params_path / f"{classifier_run_id}.json")
+            str(self.classifier_params_path / f"{classifier_run_id}_params.json")
         )
         np.savez(
             self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
@@ -401,7 +410,6 @@ class SearchClassifications:
         if precompute_classify.id is None:
             raise ValueError("Could not find precompute classify id")
 
-        print(embedding_id, label, precompute_classify.id)
         self.flush_classify_result_to_disk(embed_source, precompute_classify.id)
 
     def flush_classify_result_to_disk(

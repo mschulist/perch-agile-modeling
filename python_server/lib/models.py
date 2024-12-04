@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Sequence
 from sqlmodel import Field, SQLModel, Relationship, UniqueConstraint
 
 
@@ -263,6 +263,7 @@ class ClassifierRunResponse(BaseModel):
     datetime: str
     project_id: int
     eval_metrics: dict
+    classes: Sequence[str]
 
 
 class Token(BaseModel):

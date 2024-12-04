@@ -1,5 +1,5 @@
 from typing import List, Optional
-from chirp.projects.hoplite import interface
+from hoplite.db import interface
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 

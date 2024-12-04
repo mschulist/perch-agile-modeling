@@ -10,6 +10,7 @@ from python_server.lib.perch_utils.classify import (
     ClassifyFromLabels,
     ExamineClassifications,
     SearchClassifications,
+    get_classifier_params_path,
     get_eval_metrics_path,
 )
 from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
@@ -536,13 +537,16 @@ async def get_run_classifiers(
             get_eval_metrics_path(CLASSIFIER_PARAMS_PATH, run.id)
         )
         eval_metrics = convert_eval_metrics_to_json(eval_metrics_npz)
-        classes = LinearClassifier.load()
+        classes = LinearClassifier.load(
+            str(get_classifier_params_path(CLASSIFIER_PARAMS_PATH, run.id))
+        ).classes
         runs_response.append(
             ClassifierRunResponse(
                 id=run.id,
                 datetime=run.datetime,
                 project_id=run.project_id,
                 eval_metrics=eval_metrics,
+                classes=classes,
             )
         )
     return runs_response

@@ -41,7 +41,7 @@ export function ClassifierResults({
     fetchClassifierResults(classifyRunId).then((results) => {
       setClassifierResults(results)
     })
-  }, [])
+  }, [classifyRunId])
 
   return (
     <>

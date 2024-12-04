@@ -2,9 +2,6 @@
 
 import { ClassifyRun } from '@/models/perch'
 import { SearchClassifier } from './SearchClassifier'
-import { use, useEffect, useState } from 'react'
-import { fetchAnnotationSummary } from '../examineAnnotations/ExamineAnnotations'
-import { getCurrentProject } from '../navigation/ProjectSelector'
 import { useRouter } from 'next/navigation'
 
 export function SingleClassifyRun({
@@ -12,21 +9,10 @@ export function SingleClassifyRun({
 }: {
   classifyRun: ClassifyRun
 }) {
-  const [classifierLabels, setClassifierLabels] = useState<string[]>([])
   const metrics = classifyRun.eval_metrics
+  const classifierLabels = classifyRun.classes
 
   const router = useRouter()
-
-  useEffect(() => {
-    const projectId = getCurrentProject()?.id
-    if (projectId) {
-      // TODO: make this fetch the actual labels from the classifier
-      // instead of the annotation summary (wait for new Perch update...)
-      fetchAnnotationSummary(projectId).then((summary) => {
-        setClassifierLabels(Object.keys(summary))
-      })
-    }
-  }, [])
 
   function handleExamineClassifierResults() {
     router.push(`/classify/classify-results/${classifyRun.id}`)

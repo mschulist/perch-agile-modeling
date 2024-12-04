@@ -35,7 +35,7 @@ export function ClassifierRuns() {
           className='btn btn-primary p-2 m-4'
           onClick={() => {
             ;(
-              document.getElementById('my_modal_1') as HTMLDialogElement
+              document.getElementById('confirm_classifier') as HTMLDialogElement
             )?.showModal()
           }}
         >
@@ -54,7 +54,7 @@ export function ClassifierRuns() {
         ))}
       </div>
       {focusedRun && <SingleClassifyRun classifyRun={focusedRun} />}
-      <dialog id='my_modal_1' className='modal'>
+      <dialog id='confirm_classifier' className='modal'>
         <div className='modal-box'>
           <h3 className='font-bold text-lg'>Confirm Action</h3>
           <p className='py-4'>
@@ -72,7 +72,9 @@ export function ClassifierRuns() {
                   setMessage(mess)
                 }
                 ;(
-                  document.getElementById('my_modal_1') as HTMLDialogElement
+                  document.getElementById(
+                    'confirm_classifier'
+                  ) as HTMLDialogElement
                 )?.close()
               }}
             >

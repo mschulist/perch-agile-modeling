@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from etils import epath
-from chirp.projects.hoplite import sqlite_usearch_impl, interface
-from chirp.projects.zoo import model_configs
-from chirp.projects.agile2 import embedding_display
+from hoplite.db import sqlite_usearch_impl, interface
+from hoplite.zoo import model_configs
+from hoplite.agile import embedding_display
 import hoplite.audio_io as audio_utils
 
 from python_server.lib.models import PossibleExample, TargetRecording

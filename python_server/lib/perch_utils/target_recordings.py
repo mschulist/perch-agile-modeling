@@ -8,11 +8,12 @@ from python_server.lib.db.db import AccountsDB
 from python_server.lib.models import TargetRecording
 import tempfile
 from scipy.io import wavfile
-from chirp import audio_utils
+import hoplite.audio_io as audio_utils
+from audio_utils import slice_peaked_audio
 
 import os
 
-from chirp.taxonomy import namespace_db
+from hoplite.taxonomy import namespace_db
 
 # TARGET_RECORDINGS_PATH = epath.Path("data/target_recordings")
 
@@ -168,7 +169,7 @@ class GatherTargetRecordings:
             audio = audio_utils.load_xc_audio(
                 f"xc{xc_id}", sample_rate=self.sample_rate
             )
-            peaks = audio_utils.slice_peaked_audio(
+            peaks = slice_peaked_audio(
                 audio=audio,
                 sample_rate_hz=self.sample_rate,
                 interval_length_s=self.window_s,
