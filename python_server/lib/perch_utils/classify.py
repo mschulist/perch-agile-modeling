@@ -86,7 +86,9 @@ class ClassifyFromLabels:
         self.data_manager = self.get_data_manager()
 
         if params is None:
-            self.params, self.eval_scores = self.train_classifier(self.data_manager)
+            self.linear_model, self.eval_scores = self.train_classifier(
+                self.data_manager
+            )
 
     def get_data_manager(self):
         """
@@ -191,7 +193,10 @@ class ClassifyFromLabels:
         """
         state = {}
         state["db"] = self.hoplite_db
-        state["params"] = self.params
+        state["params"] = {
+            "beta": self.linear_model.beta,
+            "beta_bias": self.linear_model.beta_bias,
+        }
 
         self.hoplite_db.commit()
         with concurrent.futures.ThreadPoolExecutor(

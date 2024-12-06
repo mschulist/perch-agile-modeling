@@ -9,7 +9,7 @@ from python_server.lib.models import TargetRecording
 import tempfile
 from scipy.io import wavfile
 import hoplite.audio_io as audio_utils
-from audio_utils import slice_peaked_audio
+from .audio_utils import slice_peaked_audio
 
 import os
 
