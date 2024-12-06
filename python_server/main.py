@@ -500,6 +500,7 @@ async def search_classified_recordings(
             project_id=project_id,
             warehouse_path=WAREHOUSE_PATH,
             precompute_classify_path=PRECOMPUTE_CLASSIFY_PATH,
+            classifier_params_path=CLASSIFIER_PARAMS_PATH,
         )
         examine_classified.precompute_classify_results(
             logit_ranges=logit_ranges,

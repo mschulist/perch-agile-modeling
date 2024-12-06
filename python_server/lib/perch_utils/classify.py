@@ -150,6 +150,7 @@ class ClassifyFromLabels:
         emb_ids, embeddings = state[f"{name}db"].get_embeddings(embed_ids)
         logits = np.asarray(classifier.infer(state["params"], embeddings))
 
+        # TODO: make the offset a column in the table
         sources: List[str] = []
         for emb_id in emb_ids:
             source = state[f"{name}db"].get_embedding_source(emb_id)
@@ -282,6 +283,7 @@ class SearchClassifications:
         project_id: int,
         warehouse_path: str,
         precompute_classify_path: str,
+        classifier_params_path: str,
         sample_rate: int = 32000,
     ):
         """
@@ -294,6 +296,7 @@ class SearchClassifications:
         self.classify_datetime = classify_datetime
         self.sample_rate = sample_rate
         self.hoplite_db = hoplite_db
+        self.classifier_params_path = epath.Path(classifier_params_path)
 
         self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0][  # type: ignore
             "base_path"
@@ -306,6 +309,11 @@ class SearchClassifications:
         if classifier_run_id is None:
             raise ValueError("Could not find classifier run id")
         self.classifier_run_id = classifier_run_id
+
+        self.linear_model = classifier.LinearClassifier.load(
+            str(self.classifier_params_path / f"{self.classifier_run_id}_params.json")
+        )
+        self.all_labels = self.linear_model.classes
 
     def get_iceberg_table(self):
         """
@@ -342,14 +350,7 @@ class SearchClassifications:
                 "num_per_label must be greater than the number of logit ranges"
             )
         if labels is None:
-            lbs = (
-                self.iceberg_table.scan()
-                .to_duckdb("default")
-                .execute("SELECT DISTINCT label FROM default")
-                .fetchall()
-            )
-            # lbs is a list of tuples, so we just want the first element
-            labels = [lb[0] for lb in lbs]
+            labels = list(self.all_labels)
 
         # if we are getting the max logits from the range, scanning cannot do that
         # so we need to get all of the records and then select the max "manually"
