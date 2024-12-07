@@ -61,7 +61,7 @@ export function SingleAnnotation({
         >
           {editingLabels ? 'Save' : 'Change Labels'}
         </button>
-        <div className='text-sm text-gray-400'>
+        <div className='text-sm text-gray-400 max-w-96'>
           {editingLabels ? (
             <>
               New labels:
