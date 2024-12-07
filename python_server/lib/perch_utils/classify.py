@@ -403,31 +403,38 @@ class SearchClassifications:
         save the audio and image results to the precompute search directory
         """
 
-        # We need to add the classifier result to the possible_examples and finished_possible_examples
-        # table so that IF we label the example, the precomputed spectrogram and audio are already there
-
-        embed_source = self.hoplite_db.get_embedding_source(embedding_id)
-
-        possible_example = PossibleExample(
-            project_id=self.project_id,
-            score=logit,
-            embedding_id=embedding_id,
-            timestamp_s=embed_source.offsets[0],
-            filename=embed_source.source_id,
-        )
-        self.db.add_possible_example(possible_example)
-
-        # we need to get the example from the db to get the id
         possible_example = self.db.get_possible_example_by_embed_id(
             embedding_id, self.project_id
         )
-        if possible_example is None:
-            raise ValueError("Failed to get possible example from the database.")
-        if possible_example.id is None:
-            raise ValueError(
-                "Failed to get possible example from the database. Must have an ID."
+
+        embed_source = self.hoplite_db.get_embedding_source(embedding_id)
+
+        if possible_example is None or possible_example.id is None:
+            # We need to add the classifier result to the possible_examples and finished_possible_examples
+            # table so that IF we label the example, the precomputed spectrogram and audio are already there
+
+            possible_example = PossibleExample(
+                project_id=self.project_id,
+                score=logit,
+                embedding_id=embedding_id,
+                timestamp_s=embed_source.offsets[0],
+                filename=embed_source.source_id,
             )
-        self.db.finish_possible_example(possible_example)
+            self.db.add_possible_example(possible_example)
+
+            # we need to get the example from the db to get the id
+            possible_example = self.db.get_possible_example_by_embed_id(
+                embedding_id, self.project_id
+            )
+            if possible_example is None:
+                raise ValueError("Failed to get possible example from the database.")
+            if possible_example.id is None:
+                raise ValueError(
+                    "Failed to get possible example from the database. Must have an ID."
+                )
+            self.db.finish_possible_example(possible_example)
+
+            self.flush_classify_result_to_disk(embed_source, possible_example.id)
 
         # Now that the example is entered as a possible example, we can enter it as a classifier result
 
@@ -442,18 +449,6 @@ class SearchClassifications:
             possible_example_id=possible_example.id,
         )
         self.db.add_classifier_result(classifier_result)
-
-        precompute_classify = self.db.get_classifier_result_by_embed_id_and_label(
-            embedding_id, label, self.project_id
-        )
-        if precompute_classify is None:
-            raise ValueError("Could not find precompute classify id")
-        if precompute_classify.id is None:
-            raise ValueError("Could not find precompute classify id")
-
-        self.flush_classify_result_to_disk(
-            embed_source, precompute_classify.possible_example_id
-        )
 
     def flush_classify_result_to_disk(
         self, embedding_source: interface.EmbeddingSource, possible_example_id: int
@@ -504,7 +499,6 @@ class SearchClassifications:
             hop_length=self.sample_rate // 100,
             cmap="Greys",
         )
-        # for some reason librosa displays the image upside down
         plt.gca().invert_yaxis()
         plt.savefig(image_output_filepath)
         plt.close()
@@ -516,13 +510,13 @@ class ExamineClassifications:
         db: AccountsDB,
         hoplite_db: SQLiteUsearchDBExt,
         project_id: int,
-        precompute_classify_path: str,
+        precompute_search_dir: str,
         classifier_run_id: int,
     ):
         self.db = db
         self.hoplite_db = hoplite_db
         self.project_id = project_id
-        self.precompute_classify_path = epath.Path(precompute_classify_path)
+        self.precompute_search_dir = epath.Path(precompute_search_dir)
         self.classifier_run_id = classifier_run_id
 
     def get_classifier_results(self):
@@ -534,8 +528,8 @@ class ExamineClassifications:
         )
         classifier_results: List[ClassifierResultResponse] = []
         for result in results:
-            if result.id is None:
-                raise ValueError("Result id is None")
+            if result.possible_example_id is None:
+                raise ValueError("Result possible example id is None")
             if result.project_id is None:
                 raise ValueError("Result project id is None")
 
@@ -545,7 +539,7 @@ class ExamineClassifications:
             classifier_results.append(
                 ClassifierResultResponse(
                     annotated_labels=annotated_labels,
-                    id=result.id,
+                    id=result.possible_example_id,
                     embedding_id=result.embedding_id,
                     label=result.label,
                     logit=result.logit,
@@ -555,12 +549,12 @@ class ExamineClassifications:
                     classifier_run_id=result.classifier_run_id,
                     image_path=str(
                         get_possible_example_image_path(
-                            result.id, self.precompute_classify_path
+                            result.possible_example_id, self.precompute_search_dir
                         )
                     ),
                     audio_path=str(
                         get_possible_example_audio_path(
-                            result.id, self.precompute_classify_path
+                            result.possible_example_id, self.precompute_search_dir
                         )
                     ),
                 )

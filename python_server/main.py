@@ -572,7 +572,7 @@ async def get_classifier_results(
         db=db,
         hoplite_db=hoplite_db,
         project_id=project_id,
-        precompute_classify_path=PRECOMPUTE_CLASSIFY_PATH,
+        precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
         classifier_run_id=classifier_run_id,
     )
     return examine_classify.get_classifier_results()

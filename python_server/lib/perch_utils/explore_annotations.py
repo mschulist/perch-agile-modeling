@@ -82,7 +82,14 @@ class ExploreAnnotations:
                 annotated_recordings.append(annotated_recording)
             else:
                 print(
-                    f"Could not find annotated recording for embedding id {embedding_id}"
+                    f"Could not find annotated recording for embedding id {embedding_id} adding it now..."
+                )
+                create_possible_example_by_embed_id(
+                    self.project_id,
+                    self.db,
+                    self.hoplite_db,
+                    embedding_id,
+                    str(self.precompute_search_dir),
                 )
 
         return annotated_recordings
@@ -182,6 +189,14 @@ def create_possible_example_by_embed_id(
     """
     Helper function to create a possible example by the embedding id.
     """
+    existing_possible_example = db.get_possible_example_by_embed_id(
+        embedding_id, project_id
+    )
+    if existing_possible_example is not None:
+        print(
+            f"Possible example with embedding id {embedding_id} already exists. Skipping..."
+        )
+        return
     embed_source = hoplite_db.get_embedding_source(embedding_id)
     possible_example = PossibleExample(
         project_id=project_id,
@@ -190,12 +205,17 @@ def create_possible_example_by_embed_id(
         timestamp_s=embed_source.offsets[0],
         filename=embed_source.source_id,
     )
-    db.add_possible_example(possible_example)
+    try:
+        db.add_possible_example(possible_example)
+    except Exception as e:
+        print(f"Failed to add possible example to the database: {e}")
+        return
 
     # now we need to get the id of the possible example
     possible_example = db.get_possible_example_by_embed_id(embedding_id, project_id)
     if possible_example is None:
-        raise ValueError("Failed to get possible example from the database.")
+        print("Failed to get possible example from the database.")
+        return
     if possible_example.id is None:
         raise ValueError(
             "Failed to get possible example from the database. Must have an ID."

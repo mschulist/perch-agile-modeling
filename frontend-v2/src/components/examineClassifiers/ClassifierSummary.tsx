@@ -25,7 +25,7 @@ export function ClassifierSummary({
 
   return (
     <div className='flex flex-col items-center gap-4'>
-      <h2 className='text-3xl'>Annotation Summary</h2>
+      <h2 className='text-3xl'>Classifier Results Summary</h2>
       <input
         type='text'
         className='input input-bordered'
