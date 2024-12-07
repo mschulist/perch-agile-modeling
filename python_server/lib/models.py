@@ -215,6 +215,7 @@ class ClassifierResult(SQLModel, table=True):
     label: str = Field(index=True)
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
     classifier_run_id: int = Field(foreign_key="classifier_runs.id")
+    possible_example_id: int = Field(foreign_key="possible_examples.id")
 
     project: Optional[Project] = Relationship(back_populates="classifier_results")
     classifier_run: Optional[ClassifierRun] = Relationship(

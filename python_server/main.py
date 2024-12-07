@@ -456,7 +456,7 @@ async def classify_recordings(
         )
         ice_table = classifier.create_iceberg_table()
         classifier.threaded_classify(
-            ice_table, batch_size=8192, max_workers=12, table_size=500_000_000
+            ice_table, batch_size=16_384, max_workers=12, table_size=500_000_000
         )
         print("Finished classifying")
 
@@ -499,7 +499,7 @@ async def search_classified_recordings(
             classify_datetime=classified_datetime,
             project_id=project_id,
             warehouse_path=WAREHOUSE_PATH,
-            precompute_classify_path=PRECOMPUTE_CLASSIFY_PATH,
+            precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
             classifier_params_path=CLASSIFIER_PARAMS_PATH,
         )
         examine_classified.precompute_classify_results(

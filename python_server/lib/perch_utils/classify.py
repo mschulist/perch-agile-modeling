@@ -19,6 +19,7 @@ from python_server.lib.models import (
     ClassifierResult,
     ClassifierResultResponse,
     ClassifierRun,
+    PossibleExample,
 )
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
@@ -150,11 +151,13 @@ class ClassifyFromLabels:
         emb_ids, embeddings = state[f"{name}db"].get_embeddings(embed_ids)
         logits = np.asarray(classifier.infer(state["params"], embeddings))
 
-        # TODO: make the offset a column in the table
         sources: List[str] = []
+        offsets: List[float] = []
+
         for emb_id in emb_ids:
             source = state[f"{name}db"].get_embedding_source(emb_id)
             sources.append(source.source_id)
+            offsets.append(float((source.offsets[0])))
 
         num_embeddings = logits.shape[0]
         num_classes = logits.shape[1]
@@ -167,6 +170,7 @@ class ClassifyFromLabels:
         # make these all have shape (num_embeddings * num_classes,)
         sources_repeated = np.repeat(sources, num_classes)
         emb_ids_repeated = np.repeat(emb_ids, num_classes)
+        offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
         logits_flat = logits.flatten()
 
         labels_repeated = np.tile(self.labels, num_embeddings)
@@ -176,6 +180,7 @@ class ClassifyFromLabels:
                 "source": sources_repeated,
                 "embedding_id": emb_ids_repeated,
                 "label": labels_repeated,
+                "timestamp_s": offsets_repeated,
                 "logit": logits_flat,
             }
         )
@@ -258,6 +263,7 @@ class ClassifyFromLabels:
             [
                 pa.field("source", pa.string()),
                 pa.field("logit", pa.float32()),
+                pa.field("timestamp_s", pa.float32()),
                 pa.field("embedding_id", pa.int64()),
                 pa.field("label", pa.string()),
             ]
@@ -282,7 +288,7 @@ class SearchClassifications:
         classify_datetime: str,
         project_id: int,
         warehouse_path: str,
-        precompute_classify_path: str,
+        precompute_search_dir: str,
         classifier_params_path: str,
         sample_rate: int = 32000,
     ):
@@ -292,7 +298,7 @@ class SearchClassifications:
         self.db = db
         self.project_id = project_id
         self.warehouse_path = warehouse_path
-        self.precompute_classify_path = epath.Path(precompute_classify_path)
+        self.precompute_search_dir = epath.Path(precompute_search_dir)
         self.classify_datetime = classify_datetime
         self.sample_rate = sample_rate
         self.hoplite_db = hoplite_db
@@ -394,9 +400,37 @@ class SearchClassifications:
     ):
         """
         Add a precomputed classification result to the database and
-        save the audio and image results to the precompute classify directory
+        save the audio and image results to the precompute search directory
         """
+
+        # We need to add the classifier result to the possible_examples and finished_possible_examples
+        # table so that IF we label the example, the precomputed spectrogram and audio are already there
+
         embed_source = self.hoplite_db.get_embedding_source(embedding_id)
+
+        possible_example = PossibleExample(
+            project_id=self.project_id,
+            score=logit,
+            embedding_id=embedding_id,
+            timestamp_s=embed_source.offsets[0],
+            filename=embed_source.source_id,
+        )
+        self.db.add_possible_example(possible_example)
+
+        # we need to get the example from the db to get the id
+        possible_example = self.db.get_possible_example_by_embed_id(
+            embedding_id, self.project_id
+        )
+        if possible_example is None:
+            raise ValueError("Failed to get possible example from the database.")
+        if possible_example.id is None:
+            raise ValueError(
+                "Failed to get possible example from the database. Must have an ID."
+            )
+        self.db.finish_possible_example(possible_example)
+
+        # Now that the example is entered as a possible example, we can enter it as a classifier result
+
         classifier_result = ClassifierResult(
             filename=embed_source.source_id,
             timestamp_s=embed_source.offsets[0],
@@ -405,33 +439,38 @@ class SearchClassifications:
             label=label,
             project_id=self.project_id,
             classifier_run_id=self.classifier_run_id,
+            possible_example_id=possible_example.id,
         )
         self.db.add_classifier_result(classifier_result)
 
         precompute_classify = self.db.get_classifier_result_by_embed_id_and_label(
-            embedding_id, label
+            embedding_id, label, self.project_id
         )
         if precompute_classify is None:
             raise ValueError("Could not find precompute classify id")
         if precompute_classify.id is None:
             raise ValueError("Could not find precompute classify id")
 
-        self.flush_classify_result_to_disk(embed_source, precompute_classify.id)
+        self.flush_classify_result_to_disk(
+            embed_source, precompute_classify.possible_example_id
+        )
 
     def flush_classify_result_to_disk(
-        self, embedding_source: interface.EmbeddingSource, precompute_classify_id: int
+        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
     ):
         """
         Save the audio and image results to the precompute classify directory.
 
+        We use the possible example id so that we do not need to write the file twice.
+
         Args:
             embedding_source: The embedding source to save the audio and image for.
-            precompute_example_id: Id of the precompute classify example.
+            possible_example_id: Id of the possible example in the database.
         """
         # First, load the audio and save it to the precompute classify directory
         # we can reuse the same function even though it probably is not named correctly
         audio_output_filepath = get_possible_example_audio_path(
-            precompute_classify_id, self.precompute_classify_path
+            possible_example_id, self.precompute_search_dir
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
@@ -447,7 +486,7 @@ class SearchClassifications:
 
         # Second, get the spectrogram and save it to the precompute classify directory
         image_output_filepath = get_possible_example_image_path(
-            precompute_classify_id, self.precompute_classify_path
+            possible_example_id, self.precompute_search_dir
         )
 
         melspec_layer = embedding_display.get_melspec_layer(self.sample_rate)
@@ -465,6 +504,8 @@ class SearchClassifications:
             hop_length=self.sample_rate // 100,
             cmap="Greys",
         )
+        # for some reason librosa displays the image upside down
+        plt.gca().invert_yaxis()
         plt.savefig(image_output_filepath)
         plt.close()
 

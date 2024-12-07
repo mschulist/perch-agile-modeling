@@ -1,14 +1,22 @@
+import tempfile
 from typing import List, Optional
 from hoplite.db import interface
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 
-from python_server.lib.models import AnnotatedRecording
+from python_server.lib.models import AnnotatedRecording, PossibleExample
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
     get_possible_example_image_path,
 )
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
+
+from hoplite.agile import embedding_display
+import hoplite.audio_io as audio_utils
+from scipy.io import wavfile
+from librosa import display as librosa_display
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class ExploreAnnotations:
@@ -72,6 +80,10 @@ class ExploreAnnotations:
             )
             if annotated_recording is not None:
                 annotated_recordings.append(annotated_recording)
+            else:
+                print(
+                    f"Could not find annotated recording for embedding id {embedding_id}"
+                )
 
         return annotated_recordings
 
@@ -158,3 +170,97 @@ class ExploreAnnotations:
             self.hoplite_db.insert_label(label)
 
         self.hoplite_db.commit()
+
+
+def create_possible_example_by_embed_id(
+    project_id: int,
+    db: AccountsDB,
+    hoplite_db: SQLiteUsearchDBExt,
+    embedding_id: int,
+    precompute_search_dir: str,
+):
+    """
+    Helper function to create a possible example by the embedding id.
+    """
+    embed_source = hoplite_db.get_embedding_source(embedding_id)
+    possible_example = PossibleExample(
+        project_id=project_id,
+        score=-100,  # This is a placeholder value...
+        embedding_id=embedding_id,
+        timestamp_s=embed_source.offsets[0],
+        filename=embed_source.source_id,
+    )
+    db.add_possible_example(possible_example)
+
+    # now we need to get the id of the possible example
+    possible_example = db.get_possible_example_by_embed_id(embedding_id, project_id)
+    if possible_example is None:
+        raise ValueError("Failed to get possible example from the database.")
+    if possible_example.id is None:
+        raise ValueError(
+            "Failed to get possible example from the database. Must have an ID."
+        )
+    db.finish_possible_example(possible_example)
+
+    base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0]["base_path"]  # type: ignore
+
+    flush_example_to_disk(
+        embed_source,
+        possible_example.id,
+        precompute_search_dir,
+        sample_rate=32000,
+        base_path=base_path,
+    )
+
+
+def flush_example_to_disk(
+    embedding_source: interface.EmbeddingSource,
+    possible_example_id: int,
+    precompute_search_dir: str,
+    sample_rate: int,
+    base_path: str,
+):
+    """
+    Save the audio and image results to the precompute search directory.
+    """
+    # First, load the audio and save it to the precompute classify directory
+    # we can reuse the same function even though it probably is not named correctly
+    audio_output_filepath = get_possible_example_audio_path(
+        possible_example_id, epath.Path(precompute_search_dir)
+    )
+
+    audio_slice = audio_utils.load_audio_window_soundfile(
+        f"{base_path}/{embedding_source.source_id}",
+        offset_s=embedding_source.offsets[0],
+        window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
+        sample_rate=sample_rate,
+    )
+
+    with tempfile.NamedTemporaryFile() as tmp_file:
+        wavfile.write(tmp_file.name, sample_rate, np.float32(audio_slice))
+        epath.Path(tmp_file.name).copy(audio_output_filepath)
+
+    # Second, get the spectrogram and save it to the precompute classify directory
+    image_output_filepath = get_possible_example_image_path(
+        possible_example_id, epath.Path(precompute_search_dir)
+    )
+
+    melspec_layer = embedding_display.get_melspec_layer(sample_rate)
+    if audio_slice.shape[0] < sample_rate / 100 + 1:
+        # Center pad if audio is too short.
+        zs = np.zeros([sample_rate // 10], dtype=audio_slice.dtype)
+        audio_slice = np.concatenate([zs, audio_slice, zs], axis=0)
+    melspec = melspec_layer(audio_slice).T  # type: ignore
+
+    librosa_display.specshow(
+        melspec,
+        sr=sample_rate,
+        y_axis="mel",
+        x_axis="time",
+        hop_length=sample_rate // 100,
+        cmap="Greys",
+    )
+    # for some reason librosa displays the image upside down
+    plt.gca().invert_yaxis()
+    plt.savefig(image_output_filepath)
+    plt.close()

@@ -972,7 +972,7 @@ wheels = [
 [[package]]
 name = "hoplite"
 version = "0.1.0"
-source = { git = "https://github.com/google-research/hoplite?rev=7bc1eb5ad2f6f126d7d68bdc772da26586b7c12f#7bc1eb5ad2f6f126d7d68bdc772da26586b7c12f" }
+source = { git = "https://github.com/google-research/hoplite#b156d6aeadc4a0a1b2b1099fa9904349c4f3e6a2" }
 dependencies = [
     { name = "absl-py" },
     { name = "etils", extra = ["epath"] },
@@ -2577,7 +2577,7 @@ dependencies = [
 requires-dist = [
     { name = "bcrypt", specifier = ">=4.2.1" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
-    { name = "hoplite", git = "https://github.com/google-research/hoplite?rev=7bc1eb5ad2f6f126d7d68bdc772da26586b7c12f" },
+    { name = "hoplite", git = "https://github.com/google-research/hoplite" },
     { name = "jax", specifier = ">=0.4.35" },
     { name = "pyiceberg", specifier = ">=0.8.0" },
     { name = "pyjwt", specifier = ">=2.10.1" },

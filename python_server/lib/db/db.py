@@ -278,7 +278,7 @@ class AccountsDB:
             session.commit()
 
     def get_classifier_result_by_embed_id_and_label(
-        self, embed_id: int, label: str
+        self, embed_id: int, label: str, project_id: int
     ) -> Optional[ClassifierResult]:
         """
         Given an embedding id and label from the hoplite db, get the classifier result from the accounts db.
@@ -289,6 +289,7 @@ class AccountsDB:
                 and_(
                     ClassifierResult.embedding_id == int(embed_id),
                     ClassifierResult.label == label,
+                    ClassifierResult.project_id == project_id,
                 )
             )
             classifier_result = session.exec(statement).first()

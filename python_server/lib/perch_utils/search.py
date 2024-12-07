@@ -248,5 +248,8 @@ class GatherPossibleExamples:
             hop_length=self.sample_rate // 100,
             cmap="Greys",
         )
+        # for some reason, librosa has decided to make the y-axis inverted...
+        # so we need to invert it back
+        plt.gca().invert_yaxis()
         plt.savefig(image_output_filepath)
         plt.close()

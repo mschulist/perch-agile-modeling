@@ -18,4 +18,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-hoplite = { git = "https://github.com/google-research/hoplite", rev = "7bc1eb5ad2f6f126d7d68bdc772da26586b7c12f" }
+hoplite = { git = "https://github.com/google-research/hoplite" }
