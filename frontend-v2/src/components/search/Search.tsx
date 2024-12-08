@@ -1,10 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  getServerRequest,
-  postServerRequest,
-} from '@/networking/server_requests'
+import { postServerRequest } from '@/networking/server_requests'
 import { getCurrentProject } from '../navigation/ProjectSelector'
 import { MultiSelect } from '../examineAnnotations/MultiSelect'
 import { SearchFromFile } from './SearchFromFile'
