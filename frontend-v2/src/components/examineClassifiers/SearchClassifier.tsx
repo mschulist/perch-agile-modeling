@@ -76,7 +76,11 @@ export function SearchClassifier(props: SearchClassifierProps) {
           required={false}
         />
       </div>
-      <button className='btn btn-secondary' onClick={handleSearchButton}>
+      <button
+        className='btn btn-secondary'
+        onClick={handleSearchButton}
+        disabled={labels.length === 0}
+      >
         Search Classifier
       </button>
       {message && <div className='text-sm mt-2 text-green-500'>{message}</div>}

@@ -53,11 +53,10 @@ dotenv.load_dotenv()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 180
 
-PRECOMPUTE_SEARCH_DIR = "data/precompute_search"
+PRECOMPUTE_SEARCH_DIR = "gs://bird-ml/agilev2/precompute_search"
 TARGET_EXAMPLES_DIR = "data/target_examples"
 WAREHOUSE_PATH = "data/warehouse"
 CLASSIFIER_PARAMS_PATH = "data/classifier_params"
-PRECOMPUTE_CLASSIFY_PATH = "data/precompute_classify"
 
 app = FastAPI()
 
@@ -85,6 +84,30 @@ def get_hoplite_db(project_id: int):
     if project_id not in hoplite_dbs:
         hoplite_dbs[project_id] = load_hoplite_db(project_id)
     return hoplite_dbs[project_id]
+
+
+def authorize_project_access(
+    project_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AccountsDB, Depends(get_db)],
+) -> int:
+    """
+    Given a project_id, current_user, and db, check if the user has access to the project.
+
+    Returns the project id.
+    """
+    project = db.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.id is None:
+        raise HTTPException(status_code=400)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project_contributors = db.get_project_contributors(project_id)
+    allowed_users = [project.owner_id] + [c.user_id for c in project_contributors]
+    if current_user.id not in allowed_users:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return project.id
 
 
 @app.get("/users/me")
@@ -139,7 +162,21 @@ async def my_projects(
     db: Annotated[AccountsDB, Depends(get_db)],
 ):
     user = db.session.merge(current_user)
-    return user.owned_projects
+    if user.id is None:
+        raise HTTPException(status_code=400)
+    project_ids = [
+        x.project_id for x in db.get_projects_by_user(user.id) if x.project_id
+    ]
+
+    projects = [db.get_project(project_id) for project_id in project_ids]
+
+    projects = [
+        project
+        for project in projects
+        if project is not None and project not in user.owned_projects
+    ]
+
+    return user.owned_projects + projects
 
 
 @app.post("/create_project_db")
@@ -190,21 +227,13 @@ async def create_project_db_legacy(
 
 @app.post("/get_next_possible_example", response_model=PossibleExampleResponse | dict)
 async def get_next_possible_example(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
 ):
     """
     Given a user and project (that they are a part of), get the next possible example to annotate.
 
     We will return the {audio, image, possible_label, score, filename, timestamp_s} of the next possible example.
     """
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    # TODO: fix the allowed users
-    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     hoplite_db = get_hoplite_db(project_id)
     annotate = AnnotatePossibleExamples(
@@ -223,31 +252,20 @@ async def get_next_possible_example(
 async def get_file(filename: str):
     # TODO: Check if the file is in the precompute search dir
     # for security reasons
-    if not (
-        filename.startswith(PRECOMPUTE_SEARCH_DIR)
-        or filename.startswith(PRECOMPUTE_CLASSIFY_PATH)
-    ):
+    if not filename.startswith(PRECOMPUTE_SEARCH_DIR):
         raise HTTPException(status_code=403, detail="Forbidden")
     return FileResponse(filename)
 
 
 @app.post("/gather_possible_examples")
 async def gather_possible_examples(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     species_codes: List[str],
     call_types: List[str],
     num_examples_per_target: int,
     num_targets: int,
     background_tasks: BackgroundTasks,
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     def gather_examples():
         hoplite_db = load_hoplite_db(project_id)
         accounts_db = AccountsDB()
@@ -270,19 +288,13 @@ async def gather_possible_examples(
 @app.post("/annotate_example")
 async def annotate_example(
     current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     embedding_id: int,
     labels: List[str],
 ):
     """
     Given a user and project (that they are a part of), annotate an example with the given labels.
     """
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     hoplite_db = get_hoplite_db(project_id)
 
@@ -301,15 +313,8 @@ async def annotate_example(
 @app.get("/get_label_summary")
 async def get_label_summary(
     current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
@@ -326,16 +331,9 @@ async def get_label_summary(
 @app.get("/get_annotations_by_label", response_model=List[AnnotatedRecording])
 async def get_annotations_by_label(
     current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     label: str,
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
@@ -352,19 +350,13 @@ async def get_annotations_by_label(
 @app.post("/relabel_example")
 async def relabel_example(
     current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     embedding_id: int,
     labels: List[str],
 ):
     """
     Given a user and project (that they are a part of), relabel an example with the given labels.
     """
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]  # + [c.id for c in project.contributors]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     hoplite_db = get_hoplite_db(project_id)
 
@@ -417,15 +409,8 @@ async def all_species_codes():
 
 @app.get("/recordings_summary", response_model=RecordingsSummary)
 async def recordings_summary(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
     summary = get_summary(project_id, db, get_hoplite_db(project_id))
     print(summary)
     return summary
@@ -433,17 +418,9 @@ async def recordings_summary(
 
 @app.post("/classify")
 async def classify_recordings(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     background_tasks: BackgroundTasks,
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     def classify_worker():
         hoplite_db = load_hoplite_db(project_id)
         accounts_db = AccountsDB()
@@ -466,8 +443,7 @@ async def classify_recordings(
 
 @app.post("/search_classified")
 async def search_classified_recordings(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     logit_ranges: Tuple[Tuple[float, float], ...],
     num_per_range: int,
     classified_datetime: str,
@@ -475,13 +451,6 @@ async def search_classified_recordings(
     background_tasks: BackgroundTasks,
     labels: Optional[List[str]] = None,
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     # check to make sure that logit_ranges is a list of lists of length 2
     for logit_range in logit_ranges:
         if len(logit_range) != 2:
@@ -516,16 +485,8 @@ async def search_classified_recordings(
 
 @app.get("/get_classifier_runs")
 async def get_run_classifiers(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     runs = db.get_classifier_runs(project_id)
     if len(runs) == 0:
         return {"message": "No classifier runs found"}
@@ -555,17 +516,9 @@ async def get_run_classifiers(
 
 @app.get("/get_classifier_results")
 async def get_classifier_results(
-    current_user: Annotated[User, Depends(get_current_user)],
-    project_id: int,
+    project_id: Annotated[int, Depends(authorize_project_access)],
     classifier_run_id: int,
 ):
-    project = db.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    allowed_users = [project.owner_id]
-    if current_user.id not in allowed_users:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     hoplite_db = get_hoplite_db(project_id)
 
     examine_classify = ExamineClassifications(

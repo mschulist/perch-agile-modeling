@@ -500,7 +500,8 @@ class SearchClassifications:
             cmap="Greys",
         )
         plt.gca().invert_yaxis()
-        plt.savefig(image_output_filepath)
+        with epath.Path(image_output_filepath).open("wb") as f:
+            plt.savefig(f)
         plt.close()
 
 
@@ -549,12 +550,16 @@ class ExamineClassifications:
                     classifier_run_id=result.classifier_run_id,
                     image_path=str(
                         get_possible_example_image_path(
-                            result.possible_example_id, self.precompute_search_dir
+                            result.possible_example_id,
+                            self.precompute_search_dir,
+                            temp_url=True,
                         )
                     ),
                     audio_path=str(
                         get_possible_example_audio_path(
-                            result.possible_example_id, self.precompute_search_dir
+                            result.possible_example_id,
+                            self.precompute_search_dir,
+                            temp_url=True,
                         )
                     ),
                 )

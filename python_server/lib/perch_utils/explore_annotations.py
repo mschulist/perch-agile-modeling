@@ -113,10 +113,10 @@ class ExploreAnnotations:
             return None
 
         image_path = get_possible_example_image_path(
-            possible_example.id, self.precompute_search_dir
+            possible_example.id, self.precompute_search_dir, temp_url=True
         )
         audio_path = get_possible_example_audio_path(
-            possible_example.id, self.precompute_search_dir
+            possible_example.id, self.precompute_search_dir, temp_url=True
         )
 
         return AnnotatedRecording(
@@ -282,5 +282,6 @@ def flush_example_to_disk(
     )
     # for some reason librosa displays the image upside down
     plt.gca().invert_yaxis()
-    plt.savefig(image_output_filepath)
+    with epath.Path(image_output_filepath).open("wb") as f:
+        plt.savefig(f)
     plt.close()

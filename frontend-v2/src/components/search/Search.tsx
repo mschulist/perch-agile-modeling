@@ -7,6 +7,7 @@ import {
 } from '@/networking/server_requests'
 import { getCurrentProject } from '../navigation/ProjectSelector'
 import { MultiSelect } from '../examineAnnotations/MultiSelect'
+import { SearchFromFile } from './SearchFromFile'
 
 export function Search() {
   const [speciesCodes, setSpeciesCodes] = useState<string[]>([])
@@ -69,6 +70,11 @@ export function Search() {
 
   return (
     <div className='flex flex-col items-center h-5/6 gap-3'>
+      <div className='w-1/2 flex flex-col items-center gap-3'>
+        <h1 className='text-xl'>Upload a text file of species codes</h1>
+        <SearchFromFile setSpeciesCodes={setSpeciesCodes} />
+        <h2 className='text-lg'>Or manually enter below...</h2>
+      </div>
       <div className='w-1/2'>
         <MultiSelect
           options={[]}

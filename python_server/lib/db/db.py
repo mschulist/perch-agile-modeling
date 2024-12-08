@@ -6,6 +6,7 @@ from python_server.lib.models import (
     FinishedTargetRecording,
     PossibleExample,
     Project,
+    ProjectContributor,
     TargetRecording,
     User,
     FinishedPossibleExample,
@@ -49,6 +50,22 @@ class AccountsDB:
     def get_all_projects(self) -> Sequence[Project]:
         with Session(self.engine) as session:
             statement = select(Project)
+            projects = session.exec(statement).all()
+            return projects
+
+    def get_project_contributors(self, project_id: int) -> Sequence[ProjectContributor]:
+        with Session(self.engine) as session:
+            statement = select(ProjectContributor).where(
+                ProjectContributor.project_id == project_id
+            )
+            contributors = session.exec(statement).all()
+            return contributors
+
+    def get_projects_by_user(self, user_id: int) -> Sequence[ProjectContributor]:
+        with Session(self.engine) as session:
+            statement = select(ProjectContributor).where(
+                ProjectContributor.user_id == user_id
+            )
             projects = session.exec(statement).all()
             return projects
 

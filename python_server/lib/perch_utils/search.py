@@ -23,12 +23,12 @@ import numpy as np
 
 
 def get_possible_example_image_path(
-    possible_example_id: int, precompute_search_dir: epath.Path
+    possible_example_id: int, precompute_search_dir: epath.Path, temp_url: bool = False
 ) -> epath.Path | str:
     """
     Get the path to the image for the possible example with the given id.
     """
-    if str(precompute_search_dir).startswith("gs://"):
+    if str(precompute_search_dir).startswith("gs://") and temp_url:
         return get_temp_gs_url(
             f"{str(precompute_search_dir)}/{possible_example_id}.png"
         )
@@ -36,12 +36,12 @@ def get_possible_example_image_path(
 
 
 def get_possible_example_audio_path(
-    possible_example_id: int, precompute_search_dir: epath.Path
+    possible_example_id: int, precompute_search_dir: epath.Path, temp_url: bool = False
 ) -> epath.Path | str:
     """
     Get the path to the audio for the possible example with the given id.
     """
-    if str(precompute_search_dir).startswith("gs://"):
+    if str(precompute_search_dir).startswith("gs://") and temp_url:
         return get_temp_gs_url(
             f"{str(precompute_search_dir)}/{possible_example_id}.wav"
         )
@@ -251,5 +251,6 @@ class GatherPossibleExamples:
         # for some reason, librosa has decided to make the y-axis inverted...
         # so we need to invert it back
         plt.gca().invert_yaxis()
-        plt.savefig(image_output_filepath)
+        with epath.Path(image_output_filepath).open("wb") as f:
+            plt.savefig(f)
         plt.close()

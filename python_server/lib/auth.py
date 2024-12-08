@@ -14,6 +14,8 @@ import os
 
 from google.cloud import storage
 
+STORAGE_CLIENT = storage.Client()
+
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY") or "test"
@@ -94,10 +96,10 @@ def get_temp_gs_url(filepath: str) -> str:
     if not filepath.startswith("gs://"):
         raise ValueError("Filepath must begin with gs://")
 
-    storage_client = storage.Client()
     bucket_name = filepath.split("/")[2]
-    bucket = storage_client.bucket(bucket_name)
+    bucket = STORAGE_CLIENT.bucket(bucket_name)
     blob = bucket.blob("/".join(filepath.split("/")[3:]))
+    return blob.public_url
     return blob.generate_signed_url(expiration=timedelta(days=1), method="GET")
 
 

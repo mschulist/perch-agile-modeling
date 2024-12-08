@@ -171,5 +171,6 @@ class LegacyLabels:
             hop_length=self.sample_rate // 100,
             cmap="Greys",
         )
-        plt.savefig(image_output_filepath)
+        with epath.Path(image_output_filepath).open("wb") as f:
+            plt.savefig(f)
         plt.close()

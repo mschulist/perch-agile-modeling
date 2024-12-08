@@ -11,9 +11,9 @@ export default function Home() {
     </>
   )
   return (
-    <div className='min-h-screen bg-primary-content'>
+    <div className='min-h-screen bg-background'>
       {/* Header Section */}
-      <header className='bg-primary-foreground shadow-sm'>
+      <header className='shadow-sm'>
         <div className='max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8'>
           <h1 className='text-3xl font-bold text-primary'>
             Bird Vocalization Classification
@@ -22,7 +22,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className='max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8 bg-primary-content'>
+      <main className='max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8 bg-background'>
         <h2 className='text-2xl font-semibold mb-8'>Agile Modeling Workflow</h2>
 
         <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>

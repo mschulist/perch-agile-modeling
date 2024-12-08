@@ -47,7 +47,7 @@ export function ClassifierResults({
     <>
       <button
         onClick={() => router.back()}
-        className='absolute top-6 left-10 btn btn-accent'
+        className='absolute top-28 left-10 btn btn-accent'
       >
         ← Back
       </button>
