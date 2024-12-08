@@ -30,7 +30,7 @@ export function SearchClassifier(props: SearchClassifierProps) {
         props.classifiedDateTime
       )
       setMessage(message)
-    } catch (e: any) {
+    } catch {
       setMessage("Couldn't search classifier")
     }
   }

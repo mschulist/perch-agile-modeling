@@ -54,7 +54,6 @@ export function ClassifierResults({
       <div className='flex gap-4'>
         <ClassifierSummary
           classifiedResults={classifierResults}
-          singleLabel={singleLabel}
           setSingleLabel={setSingleLabel}
         />
         {singleLabel && (

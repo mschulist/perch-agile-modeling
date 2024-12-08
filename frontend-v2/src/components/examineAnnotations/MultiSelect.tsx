@@ -36,7 +36,7 @@ export function MultiSelect({
 
   useEffect(() => {
     setLabels(selected)
-  }, [selected])
+  }, [selected, setLabels])
 
   useEffect(() => {
     setSelected(labels)
@@ -162,7 +162,7 @@ export function MultiSelect({
                     }}
                     className='cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground text-base'
                   >
-                    Add "{inputValue}"
+                    Add &quot;{inputValue}&quot;
                   </CommandItem>
                 )}
             </CommandGroup>

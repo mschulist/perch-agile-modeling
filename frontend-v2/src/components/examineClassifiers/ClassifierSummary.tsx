@@ -5,13 +5,11 @@ import { useState } from 'react'
 
 type ClassifierSummaryProps = {
   classifiedResults: ClassifiedResult[]
-  singleLabel: string | null
   setSingleLabel: (label: string | null) => void
 }
 
 export function ClassifierSummary({
   classifiedResults,
-  singleLabel,
   setSingleLabel,
 }: ClassifierSummaryProps) {
   const [searchText, setSearchText] = useState('')

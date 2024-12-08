@@ -8,6 +8,7 @@ import {
 import { getCurrentProject } from '../navigation/ProjectSelector'
 import { MultiSelect } from '../examineAnnotations/MultiSelect'
 import { SearchFromFile } from './SearchFromFile'
+import { ALL_SPECIES_CODES } from '@/lib/allSpeciesCodes'
 
 export function Search() {
   const [speciesCodes, setSpeciesCodes] = useState<string[]>([])
@@ -129,12 +130,13 @@ export function Search() {
 }
 
 async function getAllSpeciesCodes() {
-  const res = await getServerRequest('all_species_codes')
-  const response = await res.json()
-  if (res.status === 200) {
-    return response.species_codes
-  }
-  throw new Error(response.error)
+  return ALL_SPECIES_CODES
+  // const res = await getServerRequest('all_species_codes')
+  // const response = await res.json()
+  // if (res.status === 200) {
+  //   return response.species_codes
+  // }
+  // throw new Error(response.error)
 }
 
 function checkSpeciesCodes(

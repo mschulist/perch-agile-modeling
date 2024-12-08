@@ -36,7 +36,7 @@ export function Auth(props: { children: React.ReactNode }) {
       setUser(user)
     }
     fetchData()
-  }, [])
+  }, [router])
 
   return (
     <AuthContext.Provider value={user}>{props.children}</AuthContext.Provider>
