@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Optional
-from sqlmodel import Field, SQLModel, Relationship
+from typing import List, Optional, Sequence
+from sqlmodel import Field, SQLModel, Relationship, UniqueConstraint
 
 
 class ProjectContributor(SQLModel, table=True):
@@ -140,7 +140,7 @@ class PossibleExample(SQLModel, table=True):
     target_recording_id: Optional[int] = Field(
         default=None, foreign_key="target_recordings.id"
     )
-    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
+    project_id: int = Field(foreign_key="projects.id")
 
     target_recording: Optional[TargetRecording] = Relationship(
         back_populates="possible_examples"
@@ -181,8 +181,7 @@ class ClassifierRun(SQLModel, table=True):
     __tablename__ = "classifier_runs"  # type: ignore
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
-
+    project_id: int = Field(foreign_key="projects.id")
     datetime: str = Field(index=True)
 
     project: Optional[Project] = Relationship(back_populates="classifier_runs")
@@ -206,6 +205,8 @@ class ClassifierResult(SQLModel, table=True):
 
     __tablename__ = "classifier_results"  # type: ignore
 
+    __table_args__ = (UniqueConstraint("label", "embedding_id"),)
+
     id: Optional[int] = Field(default=None, primary_key=True)
     filename: str = Field(index=True)
     timestamp_s: float = Field(index=True)
@@ -214,6 +215,7 @@ class ClassifierResult(SQLModel, table=True):
     label: str = Field(index=True)
     project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
     classifier_run_id: int = Field(foreign_key="classifier_runs.id")
+    possible_example_id: int = Field(foreign_key="possible_examples.id")
 
     project: Optional[Project] = Relationship(back_populates="classifier_results")
     classifier_run: Optional[ClassifierRun] = Relationship(
@@ -232,10 +234,8 @@ class FinishedClassifierResult(SQLModel, table=True):
     __tablename__ = "finished_classifier_results"  # type: ignore
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    classifier_result_id: Optional[int] = Field(
-        default=None, foreign_key="classifier_results.id"
-    )
-    project_id: Optional[int] = Field(default=None, foreign_key="projects.id")
+    classifier_result_id: int = Field(foreign_key="classifier_results.id")
+    project_id: int = Field(foreign_key="projects.id")
 
     classifier_result: Optional[ClassifierResult] = Relationship(
         back_populates="finished_classifier_results"
@@ -243,6 +243,28 @@ class FinishedClassifierResult(SQLModel, table=True):
     project: Optional[Project] = Relationship(
         back_populates="finished_classifier_results"
     )
+
+
+class ClassifierResultResponse(BaseModel):
+    id: int
+    filename: str
+    timestamp_s: float
+    logit: float
+    embedding_id: int
+    label: str
+    project_id: int
+    classifier_run_id: int
+    image_path: str
+    audio_path: str
+    annotated_labels: List[str]
+
+
+class ClassifierRunResponse(BaseModel):
+    id: int
+    datetime: str
+    project_id: int
+    eval_metrics: dict
+    classes: Sequence[str]
 
 
 class Token(BaseModel):

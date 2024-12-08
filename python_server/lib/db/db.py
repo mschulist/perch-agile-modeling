@@ -6,6 +6,7 @@ from python_server.lib.models import (
     FinishedTargetRecording,
     PossibleExample,
     Project,
+    ProjectContributor,
     TargetRecording,
     User,
     FinishedPossibleExample,
@@ -49,6 +50,22 @@ class AccountsDB:
     def get_all_projects(self) -> Sequence[Project]:
         with Session(self.engine) as session:
             statement = select(Project)
+            projects = session.exec(statement).all()
+            return projects
+
+    def get_project_contributors(self, project_id: int) -> Sequence[ProjectContributor]:
+        with Session(self.engine) as session:
+            statement = select(ProjectContributor).where(
+                ProjectContributor.project_id == project_id
+            )
+            contributors = session.exec(statement).all()
+            return contributors
+
+    def get_projects_by_user(self, user_id: int) -> Sequence[ProjectContributor]:
+        with Session(self.engine) as session:
+            statement = select(ProjectContributor).where(
+                ProjectContributor.user_id == user_id
+            )
             projects = session.exec(statement).all()
             return projects
 
@@ -278,7 +295,7 @@ class AccountsDB:
             session.commit()
 
     def get_classifier_result_by_embed_id_and_label(
-        self, embed_id: int, label: str
+        self, embed_id: int, label: str, project_id: int
     ) -> Optional[ClassifierResult]:
         """
         Given an embedding id and label from the hoplite db, get the classifier result from the accounts db.
@@ -289,6 +306,7 @@ class AccountsDB:
                 and_(
                     ClassifierResult.embedding_id == int(embed_id),
                     ClassifierResult.label == label,
+                    ClassifierResult.project_id == project_id,
                 )
             )
             classifier_result = session.exec(statement).first()
@@ -312,3 +330,42 @@ class AccountsDB:
             if classifier_run is None:
                 return None
             return classifier_run.id
+
+    def get_classifier_runs(self, project_id: int):
+        """
+        Get the classifier runs for the given project.
+        """
+        with Session(self.engine) as session:
+            statement = select(ClassifierRun).where(
+                ClassifierRun.project_id == project_id
+            )
+            classifier_runs = session.exec(statement).all()
+            return classifier_runs
+
+    def get_classifier_results(self, classifier_run_id: int, project_id: int):
+        """
+        Get the classifier results for the given classifier run and project.
+        """
+        with Session(self.engine) as session:
+            statement = select(ClassifierResult).where(
+                and_(
+                    ClassifierResult.classifier_run_id == classifier_run_id,
+                    ClassifierResult.project_id == project_id,
+                )
+            )
+            classifier_results = session.exec(statement).all()
+            return classifier_results
+
+    def get_precompute_classify_embed_ids_by_label(self, label: str, project_id: int):
+        """
+        Get the embedding ids for the given label and project.
+        """
+        with Session(self.engine) as session:
+            statement = select(ClassifierResult.embedding_id).where(
+                and_(
+                    ClassifierResult.label == label,
+                    ClassifierResult.project_id == project_id,
+                )
+            )
+            embed_ids = session.exec(statement).all()
+            return embed_ids

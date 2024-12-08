@@ -1,6 +1,5 @@
 from typing import List
-
-from chirp.taxonomy import namespace_db
+from hoplite.taxonomy import namespace_db
 
 
 def get_all_species_codes() -> List[str]:

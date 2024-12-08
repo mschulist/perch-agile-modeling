@@ -34,7 +34,6 @@ export function Auth(props: { children: React.ReactNode }) {
       }
       const user = await response.json()
       setUser(user)
-      router.push('/')
     }
     fetchData()
   }, [])

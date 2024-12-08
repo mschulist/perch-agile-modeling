@@ -1,6 +1,8 @@
 from typing import List, Optional
 from python_server.lib.db.db import AccountsDB
-from chirp.projects.hoplite import interface
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
+
+from hoplite.db import interface
 
 from etils import epath
 
@@ -15,7 +17,7 @@ class AnnotatePossibleExamples:
     def __init__(
         self,
         db: AccountsDB,
-        hoplite_db: interface.GraphSearchDBInterface,
+        hoplite_db: SQLiteUsearchDBExt,
         precompute_search_dir: epath.Path | str,
         project_id: int,
     ):

@@ -6,15 +6,15 @@ from python_server.lib.perch_utils.search import (
     get_possible_example_image_path,
 )
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
-from chirp.projects.hoplite import interface
+from hoplite.db import interface
 from etils import epath
 import numpy as np
 
 from librosa import display as librosa_display
 import matplotlib.pyplot as plt
-from chirp.projects.agile2 import embedding_display
+from hoplite.agile import embedding_display
 from scipy.io import wavfile
-from chirp import audio_utils
+from hoplite import audio_io as audio_utils
 from tqdm import tqdm
 
 
@@ -171,5 +171,6 @@ class LegacyLabels:
             hop_length=self.sample_rate // 100,
             cmap="Greys",
         )
-        plt.savefig(image_output_filepath)
+        with epath.Path(image_output_filepath).open("wb") as f:
+            plt.savefig(f)
         plt.close()

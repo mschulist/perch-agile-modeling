@@ -5,8 +5,8 @@ from python_server.lib.perch_utils import GatherPossibleExamples
 
 
 import tempfile
-from chirp.projects.agile2 import embed, source_info, colab_utils
-from chirp.projects.agile2.tests import test_utils
+from hoplite.agile import embed, source_info, colab_utils
+from hoplite.agile.tests import test_utils
 from etils import epath
 
 from python_server.lib.perch_utils.annotate import AnnotatePossibleExamples

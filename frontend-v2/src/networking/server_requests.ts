@@ -1,13 +1,14 @@
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:8000'
-
 export function getServerRequest(path: string): Promise<Response> {
   const token = localStorage.getItem('token')
-  return fetch(`${SERVER_URL}/${path}`, {
-    method: 'GET',
+  return fetch('/api/getServerRequest', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({
+      token,
+      path,
+    }),
   })
 }
 
@@ -16,21 +17,24 @@ export function postServerRequest(
   body: unknown
 ): Promise<Response> {
   const token = localStorage.getItem('token')
-  return fetch(`${SERVER_URL}/${path}`, {
+  return fetch('/api/postServerRequest', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      token,
+      path,
+      body,
+    }),
   })
 }
 
 export function loginRequest(formData: URLSearchParams): Promise<Response> {
-  return fetch(`${SERVER_URL}/token`, {
+  return fetch(`/api/login`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
     body: formData.toString(),
   })
@@ -44,7 +48,7 @@ export function getCurrentUser(): Promise<Response> {
 // already a gs url (then we would not want to prepend the server URL)
 export function getUrl(path: string) {
   const serverUrl = process.env.SERVER_URL || 'http://localhost:8000'
-  if (path.startsWith('gs://')) {
+  if (path.startsWith('https://storage.googleapis.com')) {
     return path
   }
   return `${serverUrl}/get_file?filename=${path}`

@@ -1,5 +1,5 @@
 import os
-from chirp.projects.agile2.convert_legacy import convert_tfrecords  # type: ignore
+from hoplite.agile.convert_legacy import convert_tfrecords
 
 
 def convert_legacy_tfrecords(

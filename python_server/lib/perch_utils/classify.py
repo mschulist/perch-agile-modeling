@@ -6,9 +6,21 @@ import concurrent
 import numpy as np
 import pyiceberg.table
 from pyiceberg.catalog.sql import SqlCatalog
-from pyiceberg.expressions import LessThanOrEqual, And, GreaterThanOrEqual, EqualTo
+from pyiceberg.expressions import (
+    LessThanOrEqual,
+    And,
+    GreaterThanOrEqual,
+    EqualTo,
+    NotIn,
+)
+from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
-from python_server.lib.models import ClassifierResult, ClassifierRun
+from python_server.lib.models import (
+    ClassifierResult,
+    ClassifierResultResponse,
+    ClassifierRun,
+    PossibleExample,
+)
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
     get_possible_example_image_path,
@@ -23,9 +35,27 @@ import pyarrow as pa
 from tqdm import tqdm
 from etils import epath
 
-from chirp.projects.agile2 import classifier_data, classifier, embedding_display
-from chirp.projects.hoplite import interface
-from chirp import audio_utils
+from hoplite.agile import classifier_data, classifier, embedding_display
+from hoplite.db import interface
+from hoplite import audio_io as audio_utils
+
+
+def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
+    """
+    Given run id, get the eval metrics path
+    """
+    if str(params_path).startswith("gs://"):
+        return get_temp_gs_url(f"{str(params_path)}/{run_id}_eval_scores.npz")
+    return epath.Path(params_path) / f"{run_id}_eval_scores.npz"
+
+
+def get_classifier_params_path(params_path: str | epath.Path, run_id: int):
+    """
+    Given run id, get the classifier params path
+    """
+    if str(params_path).startswith("gs://"):
+        return get_temp_gs_url(f"{str(params_path)}/{run_id}_params.json")
+    return epath.Path(params_path) / f"{run_id}_params.json"
 
 
 def worker_initializer(state: dict[str, Any]):
@@ -57,7 +87,9 @@ class ClassifyFromLabels:
         self.data_manager = self.get_data_manager()
 
         if params is None:
-            self.params, self.eval_scores = self.train_classifier(self.data_manager)
+            self.linear_model, self.eval_scores = self.train_classifier(
+                self.data_manager
+            )
 
     def get_data_manager(self):
         """
@@ -81,13 +113,11 @@ class ClassifyFromLabels:
         Adds the classifier to the database along with the evaluation scores
         """
 
-        params, eval_scores = classifier.train_linear_classifier(
+        linear_classifier, eval_scores = classifier.train_linear_classifier(
             data_manager=data_manager,
             learning_rate=1e-3,
             weak_neg_weight=0.05,
-            l2_mu=0.0,
             num_train_steps=128,
-            loss_name="bce",
         )
 
         classifier_run = ClassifierRun(
@@ -97,13 +127,19 @@ class ClassifyFromLabels:
 
         self.db.add_classifier(classifier_run)
 
-        np.savez(self.classifier_params_path / f"{self.datetime}_params.npz", **params)
+        classifier_run_id = self.db.get_classifier_run_id_by_datetime(
+            self.datetime, self.project_id
+        )
+
+        linear_classifier.save(
+            str(self.classifier_params_path / f"{classifier_run_id}_params.json")
+        )
         np.savez(
-            self.classifier_params_path / f"{self.datetime}_eval_scores.npz",
+            self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
             **eval_scores,
         )
 
-        return params, eval_scores
+        return linear_classifier, eval_scores
 
     def classify_worker_function(self, embed_ids: np.ndarray, state: dict[str, Any]):
         """
@@ -116,9 +152,12 @@ class ClassifyFromLabels:
         logits = np.asarray(classifier.infer(state["params"], embeddings))
 
         sources: List[str] = []
+        offsets: List[float] = []
+
         for emb_id in emb_ids:
             source = state[f"{name}db"].get_embedding_source(emb_id)
             sources.append(source.source_id)
+            offsets.append(float((source.offsets[0])))
 
         num_embeddings = logits.shape[0]
         num_classes = logits.shape[1]
@@ -131,6 +170,7 @@ class ClassifyFromLabels:
         # make these all have shape (num_embeddings * num_classes,)
         sources_repeated = np.repeat(sources, num_classes)
         emb_ids_repeated = np.repeat(emb_ids, num_classes)
+        offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
         logits_flat = logits.flatten()
 
         labels_repeated = np.tile(self.labels, num_embeddings)
@@ -140,6 +180,7 @@ class ClassifyFromLabels:
                 "source": sources_repeated,
                 "embedding_id": emb_ids_repeated,
                 "label": labels_repeated,
+                "timestamp_s": offsets_repeated,
                 "logit": logits_flat,
             }
         )
@@ -158,7 +199,10 @@ class ClassifyFromLabels:
         """
         state = {}
         state["db"] = self.hoplite_db
-        state["params"] = self.params
+        state["params"] = {
+            "beta": self.linear_model.beta,
+            "beta_bias": self.linear_model.beta_bias,
+        }
 
         self.hoplite_db.commit()
         with concurrent.futures.ThreadPoolExecutor(
@@ -219,6 +263,7 @@ class ClassifyFromLabels:
             [
                 pa.field("source", pa.string()),
                 pa.field("logit", pa.float32()),
+                pa.field("timestamp_s", pa.float32()),
                 pa.field("embedding_id", pa.int64()),
                 pa.field("label", pa.string()),
             ]
@@ -228,9 +273,9 @@ class ClassifyFromLabels:
         return table
 
 
-class ExamineClassifications:
+class SearchClassifications:
     """
-    Class to examine the classification results
+    Class to search the classification results
 
     The goal is to get a subset of the classification results to examine
     and label
@@ -243,7 +288,8 @@ class ExamineClassifications:
         classify_datetime: str,
         project_id: int,
         warehouse_path: str,
-        precompute_classify_path: str,
+        precompute_search_dir: str,
+        classifier_params_path: str,
         sample_rate: int = 32000,
     ):
         """
@@ -252,10 +298,11 @@ class ExamineClassifications:
         self.db = db
         self.project_id = project_id
         self.warehouse_path = warehouse_path
-        self.precompute_classify_path = epath.Path(precompute_classify_path)
+        self.precompute_search_dir = epath.Path(precompute_search_dir)
         self.classify_datetime = classify_datetime
         self.sample_rate = sample_rate
         self.hoplite_db = hoplite_db
+        self.classifier_params_path = epath.Path(classifier_params_path)
 
         self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0][  # type: ignore
             "base_path"
@@ -268,6 +315,11 @@ class ExamineClassifications:
         if classifier_run_id is None:
             raise ValueError("Could not find classifier run id")
         self.classifier_run_id = classifier_run_id
+
+        self.linear_model = classifier.LinearClassifier.load(
+            str(self.classifier_params_path / f"{self.classifier_run_id}_params.json")
+        )
+        self.all_labels = self.linear_model.classes
 
     def get_iceberg_table(self):
         """
@@ -285,8 +337,9 @@ class ExamineClassifications:
 
     def precompute_classify_results(
         self,
-        logit_ranges: Tuple[Tuple[int, int], ...],
+        logit_ranges: Tuple[Tuple[float, float], ...],
         num_per_label: int,
+        max_logits: bool = False,
         labels: Optional[List[str]] = None,
     ):
         """
@@ -294,6 +347,7 @@ class ExamineClassifications:
 
         Args:
             num_per_label: number of samples per label to examine
+            max_logits: whether to take the maximum logits from each range
             labels: list of labels to examine. If None, all labels are examined
         """
         num_per_logit_range = num_per_label // len(logit_ranges)
@@ -302,15 +356,18 @@ class ExamineClassifications:
                 "num_per_label must be greater than the number of logit ranges"
             )
         if labels is None:
-            lbs = (
-                self.iceberg_table.scan()
-                .to_duckdb("default")
-                .execute("SELECT DISTINCT label FROM default")
-                .fetchall()
-            )
-            # lbs is a list of tuples, so we just want the first element
-            labels = [lb[0] for lb in lbs]
+            labels = list(self.all_labels)
+
+        # if we are getting the max logits from the range, scanning cannot do that
+        # so we need to get all of the records and then select the max "manually"
+        limit = num_per_logit_range if not max_logits else None
         for label in labels:
+            existing_embed_ids_for_label = (
+                self.db.get_precompute_classify_embed_ids_by_label(
+                    label,
+                    self.project_id,
+                )
+            )
             for logit_range in logit_ranges:
                 start, end = logit_range
                 table = self.iceberg_table.scan(
@@ -318,9 +375,16 @@ class ExamineClassifications:
                         GreaterThanOrEqual("logit", start),
                         LessThanOrEqual("logit", end),
                         EqualTo("label", label),
+                        NotIn("embedding_id", existing_embed_ids_for_label),
                     ),
-                    limit=num_per_logit_range,
+                    limit=limit,
                 ).to_pandas()
+                if max_logits:
+                    table = (
+                        table.sort_values(by="logit", ascending=False)
+                        .reset_index()
+                        .iloc[0 : min(num_per_logit_range, table.shape[0])]
+                    )
                 for _, row in table.iterrows():
                     embedding_id = row["embedding_id"]
                     logit = row["logit"]
@@ -336,9 +400,44 @@ class ExamineClassifications:
     ):
         """
         Add a precomputed classification result to the database and
-        save the audio and image results to the precompute classify directory
+        save the audio and image results to the precompute search directory
         """
+
+        possible_example = self.db.get_possible_example_by_embed_id(
+            embedding_id, self.project_id
+        )
+
         embed_source = self.hoplite_db.get_embedding_source(embedding_id)
+
+        if possible_example is None or possible_example.id is None:
+            # We need to add the classifier result to the possible_examples and finished_possible_examples
+            # table so that IF we label the example, the precomputed spectrogram and audio are already there
+
+            possible_example = PossibleExample(
+                project_id=self.project_id,
+                score=logit,
+                embedding_id=embedding_id,
+                timestamp_s=embed_source.offsets[0],
+                filename=embed_source.source_id,
+            )
+            self.db.add_possible_example(possible_example)
+
+            # we need to get the example from the db to get the id
+            possible_example = self.db.get_possible_example_by_embed_id(
+                embedding_id, self.project_id
+            )
+            if possible_example is None:
+                raise ValueError("Failed to get possible example from the database.")
+            if possible_example.id is None:
+                raise ValueError(
+                    "Failed to get possible example from the database. Must have an ID."
+                )
+            self.db.finish_possible_example(possible_example)
+
+            self.flush_classify_result_to_disk(embed_source, possible_example.id)
+
+        # Now that the example is entered as a possible example, we can enter it as a classifier result
+
         classifier_result = ClassifierResult(
             filename=embed_source.source_id,
             timestamp_s=embed_source.offsets[0],
@@ -347,34 +446,26 @@ class ExamineClassifications:
             label=label,
             project_id=self.project_id,
             classifier_run_id=self.classifier_run_id,
+            possible_example_id=possible_example.id,
         )
         self.db.add_classifier_result(classifier_result)
 
-        precompute_classify = self.db.get_classifier_result_by_embed_id_and_label(
-            embedding_id, label
-        )
-        if precompute_classify is None:
-            raise ValueError("Could not find precompute classify id")
-        if precompute_classify.id is None:
-            raise ValueError("Could not find precompute classify id")
-
-        print(embedding_id, label, precompute_classify.id)
-        self.flush_classify_result_to_disk(embed_source, precompute_classify.id)
-
     def flush_classify_result_to_disk(
-        self, embedding_source: interface.EmbeddingSource, precompute_classify_id: int
+        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
     ):
         """
         Save the audio and image results to the precompute classify directory.
 
+        We use the possible example id so that we do not need to write the file twice.
+
         Args:
             embedding_source: The embedding source to save the audio and image for.
-            precompute_example_id: Id of the precompute classify example.
+            possible_example_id: Id of the possible example in the database.
         """
         # First, load the audio and save it to the precompute classify directory
         # we can reuse the same function even though it probably is not named correctly
         audio_output_filepath = get_possible_example_audio_path(
-            precompute_classify_id, self.precompute_classify_path
+            possible_example_id, self.precompute_search_dir
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
@@ -390,7 +481,7 @@ class ExamineClassifications:
 
         # Second, get the spectrogram and save it to the precompute classify directory
         image_output_filepath = get_possible_example_image_path(
-            precompute_classify_id, self.precompute_classify_path
+            possible_example_id, self.precompute_search_dir
         )
 
         melspec_layer = embedding_display.get_melspec_layer(self.sample_rate)
@@ -408,5 +499,69 @@ class ExamineClassifications:
             hop_length=self.sample_rate // 100,
             cmap="Greys",
         )
-        plt.savefig(image_output_filepath)
+        plt.gca().invert_yaxis()
+        with epath.Path(image_output_filepath).open("wb") as f:
+            plt.savefig(f)
         plt.close()
+
+
+class ExamineClassifications:
+    def __init__(
+        self,
+        db: AccountsDB,
+        hoplite_db: SQLiteUsearchDBExt,
+        project_id: int,
+        precompute_search_dir: str,
+        classifier_run_id: int,
+    ):
+        self.db = db
+        self.hoplite_db = hoplite_db
+        self.project_id = project_id
+        self.precompute_search_dir = epath.Path(precompute_search_dir)
+        self.classifier_run_id = classifier_run_id
+
+    def get_classifier_results(self):
+        """
+        Get all of the precomputed results from a single classifier
+        """
+        results = self.db.get_classifier_results(
+            self.classifier_run_id, self.project_id
+        )
+        classifier_results: List[ClassifierResultResponse] = []
+        for result in results:
+            if result.possible_example_id is None:
+                raise ValueError("Result possible example id is None")
+            if result.project_id is None:
+                raise ValueError("Result project id is None")
+
+            annotated_labels = [
+                label.label for label in self.hoplite_db.get_labels(result.embedding_id)
+            ]
+            classifier_results.append(
+                ClassifierResultResponse(
+                    annotated_labels=annotated_labels,
+                    id=result.possible_example_id,
+                    embedding_id=result.embedding_id,
+                    label=result.label,
+                    logit=result.logit,
+                    timestamp_s=result.timestamp_s,
+                    filename=result.filename,
+                    project_id=result.project_id,
+                    classifier_run_id=result.classifier_run_id,
+                    image_path=str(
+                        get_possible_example_image_path(
+                            result.possible_example_id,
+                            self.precompute_search_dir,
+                            temp_url=True,
+                        )
+                    ),
+                    audio_path=str(
+                        get_possible_example_audio_path(
+                            result.possible_example_id,
+                            self.precompute_search_dir,
+                            temp_url=True,
+                        )
+                    ),
+                )
+            )
+        return classifier_results

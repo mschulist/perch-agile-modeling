@@ -3,6 +3,7 @@ from typing import Annotated, Any
 
 from fastapi.security import OAuth2PasswordBearer
 import jwt
+import numpy as np
 from python_server.lib.models import TokenData, User
 from fastapi import Depends, HTTPException, status
 import bcrypt
@@ -12,6 +13,8 @@ from dotenv import load_dotenv
 import os
 
 from google.cloud import storage
+
+STORAGE_CLIENT = storage.Client()
 
 load_dotenv()
 
@@ -93,8 +96,28 @@ def get_temp_gs_url(filepath: str) -> str:
     if not filepath.startswith("gs://"):
         raise ValueError("Filepath must begin with gs://")
 
-    storage_client = storage.Client()
     bucket_name = filepath.split("/")[2]
-    bucket = storage_client.bucket(bucket_name)
+    bucket = STORAGE_CLIENT.bucket(bucket_name)
     blob = bucket.blob("/".join(filepath.split("/")[3:]))
+    return blob.public_url
     return blob.generate_signed_url(expiration=timedelta(days=1), method="GET")
+
+
+def convert_eval_metrics_to_json(eval_metrics: dict[str, Any]):
+    """
+    Convert evaluation metrics to JSON format.
+    """
+    eval = {}
+
+    # these keys have very long arrays so we don't want to send them
+    bad_keys = {"eval_ids", "eval_preds", "eval_labels"}
+    for key, value in eval_metrics.items():
+        if key in bad_keys:
+            continue
+        if isinstance(value, np.ndarray):
+            value = value.tolist()
+            eval[key] = value
+        elif isinstance(value, float):
+            eval[key] = round(value, 4)
+
+    return eval

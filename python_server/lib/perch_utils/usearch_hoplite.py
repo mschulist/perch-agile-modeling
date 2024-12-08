@@ -1,6 +1,6 @@
 import sqlite3
 from typing import Any
-from chirp.projects.hoplite import sqlite_usearch_impl
+from hoplite.db import sqlite_usearch_impl
 from ml_collections import config_dict
 import numpy as np
 from usearch import index as uindex

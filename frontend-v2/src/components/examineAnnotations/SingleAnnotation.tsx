@@ -61,7 +61,7 @@ export function SingleAnnotation({
         >
           {editingLabels ? 'Save' : 'Change Labels'}
         </button>
-        <div className='text-sm text-gray-400'>
+        <div className='text-sm text-gray-400 max-w-96'>
           {editingLabels ? (
             <>
               New labels:
@@ -96,7 +96,7 @@ export function SingleAnnotation({
   )
 }
 
-async function postNewLabels(embedding_id: number, labels: string[]) {
+export async function postNewLabels(embedding_id: number, labels: string[]) {
   console.log('posting new labels', embedding_id, labels)
   const projectId = getCurrentProject()?.id
   if (!projectId) {
