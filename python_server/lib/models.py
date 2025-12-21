@@ -287,7 +287,7 @@ class PossibleExampleResponse(BaseModel):
     target_call_type: str
 
 
-class AnnotatedRecording(BaseModel):
+class AnnotatedWindow(BaseModel):
     """
     We provide a list of species labels because a recording may have multiple species in it.
 
@@ -305,7 +305,7 @@ class AnnotatedRecording(BaseModel):
     filename: str
     timestamp_s: float
     species_labels: List[str]
-    embedding_id: int
+    embedding_id: int  # TODO: change to window id
     image_path: str
     audio_path: str
 

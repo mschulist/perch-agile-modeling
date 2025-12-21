@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from etils import epath
-from hoplite.db import sqlite_usearch_impl, interface
-from hoplite.zoo import model_configs
-from hoplite.agile import embedding_display
-import hoplite.audio_io as audio_utils
+from perch_hoplite.db import sqlite_usearch_impl, interface
+from perch_hoplite.zoo import model_configs
+from perch_hoplite.agile import embedding_display
+import perch_hoplite.audio_io as audio_utils
 
 from python_server.lib.models import PossibleExample, TargetRecording
 from python_server.lib.perch_utils.target_recordings import (
@@ -52,7 +52,7 @@ class GatherPossibleExamples:
     def __init__(
         self,
         db: AccountsDB,
-        hoplite_db: sqlite_usearch_impl.SQLiteUsearchDB,
+        hoplite_db: sqlite_usearch_impl.SQLiteUSearchDB,
         precompute_search_dir: epath.Path | str,
         target_path: epath.Path | str,
         project_id: int,
@@ -72,7 +72,7 @@ class GatherPossibleExamples:
         model_key = perch_model_config.model_key
         if not isinstance(model_key, str):
             raise ValueError("Model key must be a string.")
-        model_class = model_configs.MODEL_CLASS_MAP[model_key]
+        model_class = model_configs.get_model_class(model_key)
         model_config = perch_model_config.model_config
         if not isinstance(model_config, config_dict.ConfigDict):
             raise ValueError("Inner nested model config must be a ConfigDict.")
@@ -182,13 +182,14 @@ class GatherPossibleExamples:
             target_recording: Target recording that the search result is associated with.
         """
         # insert into database
+        window = self.hoplite_db.get_window(embedding_id)
+        recording = self.hoplite_db.get_recording(window.recording_id)
 
-        source = self.hoplite_db.get_embedding_source(embedding_id)
         possible_example = PossibleExample(
             project_id=self.project_id,
             score=score,
-            timestamp_s=source.offsets[0],
-            filename=source.source_id,
+            timestamp_s=window.offsets[0],
+            filename=recording.filename,
             target_recording_id=target_recording.id,
             target_recording=target_recording,
             embedding_id=embedding_id,
@@ -200,10 +201,10 @@ class GatherPossibleExamples:
             raise ValueError("Failed to add possible example to the database.")
 
         # save the audio and image results
-        self.flush_search_result_to_disk(source, possible_example_id)
+        self.flush_search_result_to_disk(window, possible_example_id)
 
     def flush_search_result_to_disk(
-        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
+        self, embedding_source: interface.Window, possible_example_id: int
     ):
         """
         Save the audio and image results to the precompute search directory.
@@ -218,7 +219,7 @@ class GatherPossibleExamples:
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
-            f"{self.base_path}/{embedding_source.source_id}",
+            f"{self.base_path}/{embedding_source.recording_id}",
             offset_s=embedding_source.offsets[0],
             window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
             sample_rate=self.sample_rate,

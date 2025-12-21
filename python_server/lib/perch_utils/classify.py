@@ -1,7 +1,7 @@
 import concurrent.futures
 import tempfile
 import threading
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple
 import concurrent
 import numpy as np
 import pyiceberg.table
@@ -35,9 +35,12 @@ import pyarrow as pa
 from tqdm import tqdm
 from etils import epath
 
-from hoplite.agile import classifier_data, classifier, embedding_display
-from hoplite.db import interface
-from hoplite import audio_io as audio_utils
+from perch_hoplite.agile import classifier_data, classifier, embedding_display
+from perch_hoplite.db import interface
+from perch_hoplite import audio_io as audio_utils
+from ml_collections import config_dict
+
+THROWAWAY_CLASSES = set("review")
 
 
 def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
@@ -63,6 +66,18 @@ def worker_initializer(state: dict[str, Any]):
     state[f"{name}db"] = state["db"].thread_split()
 
 
+def batched_embedding_iterator(
+    db: SQLiteUsearchDBExt,
+    window_ids: np.ndarray,
+    batch_size: int = 1024,
+) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    """Iterate over embeddings in batches."""
+    for q in range(0, len(window_ids), batch_size):
+        batch_ids = window_ids[q : q + batch_size]
+        batch_embs = db.get_embeddings_batch(batch_ids)
+        yield batch_ids, batch_embs
+
+
 class ClassifyFromLabels:
     def __init__(
         self,
@@ -71,7 +86,7 @@ class ClassifyFromLabels:
         project_id: int,
         warehouse_path: str,
         classifier_params_path: str,
-        params: np.ndarray | None = None,
+        linear_classifier: classifier.LinearClassifier | None = None,
     ):
         self.db = db
         self.hoplite_db = hoplite_db
@@ -81,12 +96,14 @@ class ClassifyFromLabels:
 
         self.datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # TODO: maybe make this a parameter...
-        self.labels = tuple([x for x in self.hoplite_db.get_classes() if x != "review"])
+        self.labels = tuple(
+            [x for x in self.hoplite_db.get_all_labels() if x not in THROWAWAY_CLASSES]
+        )
 
         self.data_manager = self.get_data_manager()
 
-        if params is None:
+        self.linear_classifier = linear_classifier
+        if linear_classifier is None:
             self.linear_model, self.eval_scores = self.train_classifier(
                 self.data_manager
             )
@@ -136,114 +153,132 @@ class ClassifyFromLabels:
         )
         np.savez(
             self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
-            **eval_scores,
+            *eval_scores,
         )
 
         return linear_classifier, eval_scores
 
-    def classify_worker_function(self, embed_ids: np.ndarray, state: dict[str, Any]):
+    def iceberg_write_worker(
+        self, table: pa.Table, iceberg_table: pyiceberg.table.Table
+    ) -> None:
         """
-        Given a list of embed_ids, classify the embeddings
-
-        State contains relevant information to classify, such as a db connection, parameters, etc.
+        Worker function to write a PyArrow table to the iceberg table.
+        This runs in a separate thread from inference.
         """
-        name = threading.current_thread().name
-        emb_ids, embeddings = state[f"{name}db"].get_embeddings(embed_ids)
-        logits = np.asarray(classifier.infer(state["params"], embeddings))
-
-        sources: List[str] = []
-        offsets: List[float] = []
-
-        for emb_id in emb_ids:
-            source = state[f"{name}db"].get_embedding_source(emb_id)
-            sources.append(source.source_id)
-            offsets.append(float((source.offsets[0])))
-
-        num_embeddings = logits.shape[0]
-        num_classes = logits.shape[1]
-
-        if num_classes != len(self.labels):
-            raise ValueError(
-                "Number of classes in the classifier does not match the number of labels"
-            )
-
-        # make these all have shape (num_embeddings * num_classes,)
-        sources_repeated = np.repeat(sources, num_classes)
-        emb_ids_repeated = np.repeat(emb_ids, num_classes)
-        offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
-        logits_flat = logits.flatten()
-
-        labels_repeated = np.tile(self.labels, num_embeddings)
-
-        table = pa.table(
-            {
-                "source": sources_repeated,
-                "embedding_id": emb_ids_repeated,
-                "label": labels_repeated,
-                "timestamp_s": offsets_repeated,
-                "logit": logits_flat,
-            }
-        )
-
-        return table
+        iceberg_table.append(table)
 
     def threaded_classify(
         self,
         iceberg_table: pyiceberg.table.Table,
         batch_size: int = 4096,
-        max_workers: int = 12,
+        max_workers: int = 2,
         table_size: int = 100_000,
     ):
         """
-        Performs a threaded classification of the embeddings in the database
-        """
-        state = {}
-        state["db"] = self.hoplite_db
-        state["params"] = {
-            "beta": self.linear_model.beta,
-            "beta_bias": self.linear_model.beta_bias,
-        }
+        Performs classification of the embeddings in the database.
 
+        Inference is done in the main thread, and writing to the iceberg table
+        is done in a separate thread pool.
+
+        Args:
+            iceberg_table: The iceberg table to write results to
+            batch_size: Number of embeddings to process per batch
+            max_workers: Number of worker threads for writing to iceberg
+            table_size: Size of accumulated table before writing to iceberg
+        """
+
+        # Do inference in the main thread, write to iceberg in separate thread
         self.hoplite_db.commit()
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=max_workers,
-            initializer=worker_initializer,
-            initargs=(state,),
-        ) as executor:
-            ids = self.hoplite_db.get_embedding_ids()
-            futures = []
-            for q in range(0, ids.shape[0], batch_size):
-                futures.append(
+
+        # Get all window ids to classify
+        window_ids = np.array(self.hoplite_db.match_window_ids())
+
+        current_table = None
+        write_futures = []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Process embeddings in batches
+            for batch_ids, batch_embs in tqdm(
+                batched_embedding_iterator(self.hoplite_db, window_ids, batch_size),
+                total=len(window_ids) // batch_size + 1,
+                desc="Classifying",
+            ):
+                # Do inference in main thread
+                logits = np.asarray(self.linear_model(batch_embs))
+
+                # Get source information for each embedding
+                filenames: List[str] = []
+                offsets: List[float] = []
+
+                for window_id in batch_ids:
+                    window = self.hoplite_db.get_window(window_id)
+                    filenames.append(
+                        self.hoplite_db.get_recording(window.recording_id).filename
+                    )
+                    offsets.append(float(window.offsets[0]))
+
+                num_embeddings = logits.shape[0]
+                num_classes = logits.shape[1]
+
+                if num_classes != len(self.labels):
+                    raise ValueError(
+                        "Number of classes in the classifier does not match the number of labels"
+                    )
+
+                # Create flattened arrays for PyArrow table
+                filenames_repeated = np.repeat(filenames, num_classes)
+                window_ids_repeated = np.repeat(batch_ids, num_classes)
+                offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
+                logits_flat = logits.flatten()
+                labels_repeated = np.tile(self.labels, num_embeddings)
+
+                batch_table = pa.table(
+                    {
+                        "filename": filenames_repeated,
+                        "window_id": window_ids_repeated,
+                        "label": labels_repeated,
+                        "timestamp_s": offsets_repeated,
+                        "logit": logits_flat,
+                    }
+                )
+
+                # Accumulate tables
+                if current_table is None:
+                    current_table = batch_table
+                else:
+                    current_table = pa.concat_tables([current_table, batch_table])
+
+                # When we have enough rows, submit write to thread pool
+                if current_table.num_rows >= table_size:
+                    write_futures.append(
+                        executor.submit(
+                            self.iceberg_write_worker,
+                            current_table,
+                            iceberg_table,
+                        )
+                    )
+                    current_table = None
+
+            # Write any remaining data
+            if current_table is not None and current_table.num_rows > 0:
+                write_futures.append(
                     executor.submit(
-                        self.classify_worker_function,
-                        ids[q : q + batch_size],
-                        state,
+                        self.iceberg_write_worker,
+                        current_table,
+                        iceberg_table,
                     )
                 )
 
-            current_table = None
-
+            # Wait for all writes to complete
             for f in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Classifying",
+                concurrent.futures.as_completed(write_futures),
+                total=len(write_futures),
+                desc="Writing to Iceberg",
             ):
                 try:
-                    table = f.result()
-                    if current_table is None:
-                        current_table = table
-                    else:
-                        current_table = pa.concat_tables([current_table, table])
-
-                    if current_table.num_rows >= table_size:
-                        iceberg_table.append(current_table)
-                        current_table = None
+                    f.result()
                 except Exception as e:
-                    print(f"Exception in future: {e}")
-                    continue
-
-            if current_table is not None and current_table.num_rows > 0:
-                iceberg_table.append(current_table)
+                    print(f"Exception writing to iceberg: {e}")
 
     def create_iceberg_table(self):
         """
@@ -375,7 +410,7 @@ class SearchClassifications:
                         GreaterThanOrEqual("logit", start),
                         LessThanOrEqual("logit", end),
                         EqualTo("label", label),
-                        NotIn("embedding_id", existing_embed_ids_for_label),
+                        NotIn("window_id", existing_embed_ids_for_label),
                     ),
                     limit=limit,
                 ).to_pandas()
@@ -386,28 +421,27 @@ class SearchClassifications:
                         .iloc[0 : min(num_per_logit_range, table.shape[0])]
                     )
                 for _, row in table.iterrows():
-                    embedding_id = row["embedding_id"]
+                    window_id = row["window_id"]
                     logit = row["logit"]
                     label = row["label"]
                     self.add_precompute_classify_result(
-                        embedding_id=embedding_id,
+                        window_id=window_id,
                         logit=logit,
                         label=label,
                     )
 
-    def add_precompute_classify_result(
-        self, embedding_id: int, logit: float, label: str
-    ):
+    def add_precompute_classify_result(self, window_id: int, logit: float, label: str):
         """
         Add a precomputed classification result to the database and
         save the audio and image results to the precompute search directory
         """
+        window = self.hoplite_db.get_window(window_id)
 
         possible_example = self.db.get_possible_example_by_embed_id(
-            embedding_id, self.project_id
+            window_id, self.project_id
         )
 
-        embed_source = self.hoplite_db.get_embedding_source(embedding_id)
+        recording = self.hoplite_db.get_recording(window.recording_id)
 
         if possible_example is None or possible_example.id is None:
             # We need to add the classifier result to the possible_examples and finished_possible_examples
@@ -416,15 +450,15 @@ class SearchClassifications:
             possible_example = PossibleExample(
                 project_id=self.project_id,
                 score=logit,
-                embedding_id=embedding_id,
-                timestamp_s=embed_source.offsets[0],
-                filename=embed_source.source_id,
+                embedding_id=window_id,
+                timestamp_s=recording.offsets[0],
+                filename=recording.filename,
             )
             self.db.add_possible_example(possible_example)
 
             # we need to get the example from the db to get the id
             possible_example = self.db.get_possible_example_by_embed_id(
-                embedding_id, self.project_id
+                window_id, self.project_id
             )
             if possible_example is None:
                 raise ValueError("Failed to get possible example from the database.")
@@ -434,15 +468,15 @@ class SearchClassifications:
                 )
             self.db.finish_possible_example(possible_example)
 
-            self.flush_classify_result_to_disk(embed_source, possible_example.id)
+            self.flush_classify_result_to_disk(window, possible_example.id)
 
         # Now that the example is entered as a possible example, we can enter it as a classifier result
 
         classifier_result = ClassifierResult(
-            filename=embed_source.source_id,
-            timestamp_s=embed_source.offsets[0],
+            filename=recording.filename,
+            timestamp_s=window.offsets[0],
             logit=logit,
-            embedding_id=embedding_id,
+            embedding_id=window_id,
             label=label,
             project_id=self.project_id,
             classifier_run_id=self.classifier_run_id,
@@ -451,7 +485,7 @@ class SearchClassifications:
         self.db.add_classifier_result(classifier_result)
 
     def flush_classify_result_to_disk(
-        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
+        self, window: interface.Window, possible_example_id: int
     ):
         """
         Save the audio and image results to the precompute classify directory.
@@ -469,8 +503,8 @@ class SearchClassifications:
         )
 
         audio_slice = audio_utils.load_audio_window_soundfile(
-            f"{self.base_path}/{embedding_source.source_id}",
-            offset_s=embedding_source.offsets[0],
+            f"{self.base_path}/{self.hoplite_db.get_recording(window.recording_id).filename}",
+            offset_s=window.offsets[0],
             window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
             sample_rate=self.sample_rate,
         )
@@ -535,7 +569,11 @@ class ExamineClassifications:
                 raise ValueError("Result project id is None")
 
             annotated_labels = [
-                label.label for label in self.hoplite_db.get_labels(result.embedding_id)
+                label.label
+                for label in self.hoplite_db.get_all_annotations(
+                    config_dict.create(eq={"window_id": result.embedding_id})
+                )
+                # label.label for label in self.hoplite_db.get_labels(result.embedding_id)
             ]
             classifier_results.append(
                 ClassifierResultResponse(

@@ -13,15 +13,17 @@ from python_server.lib.perch_utils.classify import (
     get_classifier_params_path,
     get_eval_metrics_path,
 )
-from python_server.lib.perch_utils.explore_annotations import ExploreAnnotations
+from python_server.lib.perch_utils.explore_annotations import (
+    ExploreAnnotations,
+    flush_window_to_disk,
+)
 from python_server.lib.perch_utils.legacy_labels import LegacyLabels
 from python_server.lib.perch_utils.search import (
     GatherPossibleExamples,
 )
 from python_server.lib.perch_utils.summary import get_summary
-from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 
-from hoplite.agile.classifier import LinearClassifier
+from perch_hoplite.agile.classifier import LinearClassifier
 
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
 
@@ -36,7 +38,7 @@ from .lib.auth import (
     hash_password,
 )
 from .lib.models import (
-    AnnotatedRecording,
+    AnnotatedWindow,
     ClassifierRunResponse,
     PossibleExampleResponse,
     Project,
@@ -48,15 +50,17 @@ from .lib.models import (
 from .lib.db import AccountsDB
 import dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from etils import epath
 
 dotenv.load_dotenv()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 180
 
-PRECOMPUTE_SEARCH_DIR = "gs://bird-ml/agilev2/precompute_search"
+PRECOMPUTE_SEARCH_DIR = "data/precomputed_windows"
 TARGET_EXAMPLES_DIR = "data/target_examples"
 WAREHOUSE_PATH = "data/warehouse"
 CLASSIFIER_PARAMS_PATH = "data/classifier_params"
+ARU_DATA_DIR = "/home/mschulist/caples_sound/ARU_data_all"
 
 app = FastAPI()
 
@@ -72,18 +76,8 @@ db = AccountsDB()
 db.create_db_and_tables()
 projects = db.get_all_projects()
 
-hoplite_dbs: dict[int, SQLiteUsearchDBExt] = {}
-
-for project in projects:
-    if project.id is None:
-        continue
-    hoplite_dbs[project.id] = load_hoplite_db(project.id)
-
-
-def get_hoplite_db(project_id: int):
-    if project_id not in hoplite_dbs:
-        hoplite_dbs[project_id] = load_hoplite_db(project_id)
-    return hoplite_dbs[project_id]
+# all projects are under a single hoplite db, v2
+hoplite_db = load_hoplite_db(2)
 
 
 def authorize_project_access(
@@ -235,7 +229,6 @@ async def get_next_possible_example(
     We will return the {audio, image, possible_label, score, filename, timestamp_s} of the next possible example.
     """
 
-    hoplite_db = get_hoplite_db(project_id)
     annotate = AnnotatePossibleExamples(
         db=db,
         hoplite_db=hoplite_db,
@@ -254,7 +247,18 @@ async def get_file(filename: str):
     # for security reasons
     if not filename.startswith(PRECOMPUTE_SEARCH_DIR):
         raise HTTPException(status_code=403, detail="Forbidden")
-    return FileResponse(filename)
+
+    if epath.Path(filename).exists():
+        return FileResponse(filename)
+
+    # TODO: check to see if we have precomputed the file.
+    # if not, then precompute it before returning
+    window_id = int(filename.split("/")[-1].split(".")[0])
+    window = hoplite_db.get_window(window_id)
+    recording = hoplite_db.get_recording(window.recording_id)
+
+    # sample_rate = 32000
+    flush_window_to_disk(recording, window, PRECOMPUTE_SEARCH_DIR, 32000, ARU_DATA_DIR)
 
 
 @app.post("/gather_possible_examples")
@@ -266,6 +270,8 @@ async def gather_possible_examples(
     num_targets: int,
     background_tasks: BackgroundTasks,
 ):
+    return {"message": "Searching is currently disabled", "success": False}
+
     def gather_examples():
         hoplite_db = load_hoplite_db(project_id)
         accounts_db = AccountsDB()
@@ -296,8 +302,6 @@ async def annotate_example(
     Given a user and project (that they are a part of), annotate an example with the given labels.
     """
 
-    hoplite_db = get_hoplite_db(project_id)
-
     annotate = AnnotatePossibleExamples(
         db=db,
         hoplite_db=hoplite_db,
@@ -315,8 +319,6 @@ async def get_label_summary(
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: Annotated[int, Depends(authorize_project_access)],
 ):
-    hoplite_db = get_hoplite_db(project_id)
-
     explore = ExploreAnnotations(
         db=db,
         hoplite_db=hoplite_db,  # type: ignore
@@ -328,14 +330,12 @@ async def get_label_summary(
     return label_summary
 
 
-@app.get("/get_annotations_by_label", response_model=List[AnnotatedRecording])
+@app.get("/get_annotations_by_label", response_model=List[AnnotatedWindow])
 async def get_annotations_by_label(
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: Annotated[int, Depends(authorize_project_access)],
     label: str,
 ):
-    hoplite_db = get_hoplite_db(project_id)
-
     explore = ExploreAnnotations(
         db=db,
         hoplite_db=hoplite_db,
@@ -357,8 +357,6 @@ async def relabel_example(
     """
     Given a user and project (that they are a part of), relabel an example with the given labels.
     """
-
-    hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
         db=db,
@@ -388,8 +386,6 @@ async def add_legacy_labels(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    hoplite_db = get_hoplite_db(project_id)
-
     legacy_labels = LegacyLabels(
         db=db,
         hoplite_db=hoplite_db,
@@ -411,7 +407,7 @@ async def all_species_codes():
 async def recordings_summary(
     project_id: Annotated[int, Depends(authorize_project_access)],
 ):
-    summary = get_summary(project_id, db, get_hoplite_db(project_id))
+    summary = get_summary(project_id, db, hoplite_db)
     print(summary)
     return summary
 
@@ -519,8 +515,6 @@ async def get_classifier_results(
     project_id: Annotated[int, Depends(authorize_project_access)],
     classifier_run_id: int,
 ):
-    hoplite_db = get_hoplite_db(project_id)
-
     examine_classify = ExamineClassifications(
         db=db,
         hoplite_db=hoplite_db,

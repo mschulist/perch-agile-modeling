@@ -6,15 +6,15 @@ from python_server.lib.perch_utils.search import (
     get_possible_example_image_path,
 )
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
-from hoplite.db import interface
+from perch_hoplite.db import interface
 from etils import epath
 import numpy as np
 
 from librosa import display as librosa_display
 import matplotlib.pyplot as plt
-from hoplite.agile import embedding_display
+from perch_hoplite.agile import embedding_display
 from scipy.io import wavfile
-from hoplite import audio_io as audio_utils
+from perch_hoplite import audio_io as audio_utils
 from tqdm import tqdm
 
 

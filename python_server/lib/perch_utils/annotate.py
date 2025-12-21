@@ -2,7 +2,7 @@ from typing import List, Optional
 from python_server.lib.db.db import AccountsDB
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 
-from hoplite.db import interface
+from perch_hoplite.db import interface
 
 from etils import epath
 
@@ -56,13 +56,12 @@ class AnnotatePossibleExamples:
             provenance: The provenance of the label. Name of the person who labeled the example.
             finish: If True, the possible example will be finished and not shown again.
         """
-        label = interface.Label(
-            embedding_id=possible_example.embedding_id,
+        succ = self.hoplite_db.insert_annotation(
+            window_id=possible_example.embedding_id,
             label=annotation,
-            type=interface.LabelType.POSITIVE,
+            label_type=interface.LabelType.POSITIVE,
             provenance=provenance,
         )
-        succ = self.hoplite_db.insert_label(label)
         if not succ:
             raise ValueError("Could not insert label.")
         if finish:
