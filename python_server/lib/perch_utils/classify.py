@@ -102,8 +102,8 @@ class ClassifyFromLabels:
 
         self.data_manager = self.get_data_manager()
 
-        self.linear_classifier = linear_classifier
-        if linear_classifier is None:
+        self.linear_model = linear_classifier
+        if self.linear_model is None:
             self.linear_model, self.eval_scores = self.train_classifier(
                 self.data_manager
             )
@@ -204,14 +204,14 @@ class ClassifyFromLabels:
                 desc="Classifying",
             ):
                 # Do inference in main thread
-                logits = np.asarray(self.linear_model(batch_embs))
+                logits = np.asarray(self.linear_model(batch_embs))  # type: ignore
 
                 # Get source information for each embedding
                 filenames: List[str] = []
                 offsets: List[float] = []
 
                 for window_id in batch_ids:
-                    window = self.hoplite_db.get_window(window_id)
+                    window = self.hoplite_db.get_window(int(window_id))
                     filenames.append(
                         self.hoplite_db.get_recording(window.recording_id).filename
                     )
@@ -571,7 +571,7 @@ class ExamineClassifications:
             annotated_labels = [
                 label.label
                 for label in self.hoplite_db.get_all_annotations(
-                    config_dict.create(eq={"window_id": result.embedding_id})
+                    config_dict.create(eq=dict(window_id=result.embedding_id))
                 )
                 # label.label for label in self.hoplite_db.get_labels(result.embedding_id)
             ]

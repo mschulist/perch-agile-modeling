@@ -66,7 +66,7 @@ class ExploreAnnotations:
             List of AnnotatedWindows for the given species.
         """
         window_ids = self.hoplite_db.match_window_ids(
-            annotations_filter=config_dict.create(eq={"label": label})
+            annotations_filter=config_dict.create(eq=dict(label=label))
         )
         if len(window_ids) == 0:
             return []
@@ -81,7 +81,7 @@ class ExploreAnnotations:
             if window is not None:
                 recording = self.hoplite_db.get_recording(window.recording_id)
                 labels = self.hoplite_db.get_all_annotations(
-                    config_dict.create(eq={"window_id", window.id})
+                    config_dict.create(eq=dict(window_id=window.id))
                 )
                 annotated_window = AnnotatedWindow(
                     filename=recording.filename,
@@ -123,7 +123,7 @@ class ExploreAnnotations:
 
         # first get the annotation that matches the window_id and label
         annotations = self.hoplite_db.get_all_annotations(
-            config_dict.create(eq={"window_id": window_id, "label": label})
+            config_dict.create(eq=dict(window_id=window_id, label=label))
         )
         # make sure that we have a single annotation
         if len(annotations) == 0:
@@ -154,7 +154,7 @@ class ExploreAnnotations:
         old_labels_set = {
             x.label
             for x in self.hoplite_db.get_all_annotations(
-                config_dict.create(eq={"window_id": window_id})
+                config_dict.create(eq=dict(window_id=window_id))
             )
         }
         new_labels_set = set(new_labels)
@@ -224,7 +224,6 @@ def flush_window_to_disk(
         cmap="Greys",
     )
     # for some reason librosa displays the image upside down
-    plt.gca().invert_yaxis()
     with epath.Path(image_output_filepath).open("wb") as f:
         plt.savefig(f)
     plt.close()

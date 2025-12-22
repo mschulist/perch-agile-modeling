@@ -259,6 +259,7 @@ async def get_file(filename: str):
 
     # sample_rate = 32000
     flush_window_to_disk(recording, window, PRECOMPUTE_SEARCH_DIR, 32000, ARU_DATA_DIR)
+    return FileResponse(filename)
 
 
 @app.post("/gather_possible_examples")
@@ -416,9 +417,15 @@ async def recordings_summary(
 async def classify_recordings(
     project_id: Annotated[int, Depends(authorize_project_access)],
     background_tasks: BackgroundTasks,
+    linear_classifier_num: None | str,
 ):
+    if linear_classifier_num:
+        lc = LinearClassifier.load(f"data/classifier_params/{linear_classifier_num}_params.json")
+    else:
+        lc = None
     def classify_worker():
-        hoplite_db = load_hoplite_db(project_id)
+        # all use project 2 for now...
+        hoplite_db = load_hoplite_db(2)
         accounts_db = AccountsDB()
         classifier = ClassifyFromLabels(
             db=accounts_db,
@@ -426,6 +433,7 @@ async def classify_recordings(
             project_id=project_id,
             warehouse_path=WAREHOUSE_PATH,
             classifier_params_path=CLASSIFIER_PARAMS_PATH,
+            linear_classifier=lc
         )
         ice_table = classifier.create_iceberg_table()
         classifier.threaded_classify(
@@ -456,7 +464,8 @@ async def search_classified_recordings(
             )
 
     def search_worker():
-        hoplite_db = load_hoplite_db(project_id)
+        # all use project 2 for now...
+        hoplite_db = load_hoplite_db(2)
         accounts_db = AccountsDB()
         examine_classified = SearchClassifications(
             db=accounts_db,
@@ -523,3 +532,7 @@ async def get_classifier_results(
         classifier_run_id=classifier_run_id,
     )
     return examine_classify.get_classifier_results()
+
+@app.get("/")
+async def status_method():
+    return {"status": "Okay! :)"}
