@@ -1,8 +1,5 @@
-import concurrent.futures
 import tempfile
-import threading
-from typing import Any, Iterator, List, Optional, Tuple
-import concurrent
+from typing import Iterator, List, Optional, Tuple
 import numpy as np
 import pyiceberg.table
 from pyiceberg.catalog.sql import SqlCatalog
@@ -59,11 +56,6 @@ def get_classifier_params_path(params_path: str | epath.Path, run_id: int):
     if str(params_path).startswith("gs://"):
         return get_temp_gs_url(f"{str(params_path)}/{run_id}_params.json")
     return epath.Path(params_path) / f"{run_id}_params.json"
-
-
-def worker_initializer(state: dict[str, Any]):
-    name = threading.current_thread().name
-    state[f"{name}db"] = state["db"].thread_split()
 
 
 def batched_embedding_iterator(
@@ -158,127 +150,96 @@ class ClassifyFromLabels:
 
         return linear_classifier, eval_scores
 
-    def iceberg_write_worker(
-        self, table: pa.Table, iceberg_table: pyiceberg.table.Table
-    ) -> None:
-        """
-        Worker function to write a PyArrow table to the iceberg table.
-        This runs in a separate thread from inference.
-        """
-        iceberg_table.append(table)
-
     def threaded_classify(
         self,
         iceberg_table: pyiceberg.table.Table,
         batch_size: int = 4096,
-        max_workers: int = 2,
         table_size: int = 100_000,
     ):
         """
         Performs classification of the embeddings in the database.
 
-        Inference is done in the main thread, and writing to the iceberg table
-        is done in a separate thread pool.
-
         Args:
             iceberg_table: The iceberg table to write results to
             batch_size: Number of embeddings to process per batch
-            max_workers: Number of worker threads for writing to iceberg
             table_size: Size of accumulated table before writing to iceberg
         """
-
-        # Do inference in the main thread, write to iceberg in separate thread
         self.hoplite_db.commit()
 
         # Get all window ids to classify
         window_ids = np.array(self.hoplite_db.match_window_ids())
 
         current_table = None
-        write_futures = []
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Process embeddings in batches
-            for batch_ids, batch_embs in tqdm(
-                batched_embedding_iterator(self.hoplite_db, window_ids, batch_size),
-                total=len(window_ids) // batch_size + 1,
-                desc="Classifying",
-            ):
-                # Do inference in main thread
-                logits = np.asarray(self.linear_model(batch_embs))  # type: ignore
+        # Process embeddings in batches
+        for batch_ids, batch_embs in tqdm(
+            batched_embedding_iterator(self.hoplite_db, window_ids, batch_size),
+            total=len(window_ids) // batch_size + 1,
+            desc="Classifying and writing",
+        ):
+            # Do inference
+            logits = np.asarray(self.linear_model(batch_embs))  # type: ignore
 
-                # Get source information for each embedding
-                filenames: List[str] = []
-                offsets: List[float] = []
+            # Get source information for each embedding
+            filenames: List[str] = []
+            offsets: List[float] = []
 
-                for window_id in batch_ids:
-                    window = self.hoplite_db.get_window(int(window_id))
-                    filenames.append(
-                        self.hoplite_db.get_recording(window.recording_id).filename
-                    )
-                    offsets.append(float(window.offsets[0]))
+            for window_id in batch_ids:
+                window = self.hoplite_db.get_window(int(window_id))
+                filenames.append(
+                    self.hoplite_db.get_recording(window.recording_id).filename
+                )
+                offsets.append(float(window.offsets[0]))
 
-                num_embeddings = logits.shape[0]
-                num_classes = logits.shape[1]
+            num_embeddings = logits.shape[0]
+            num_classes = logits.shape[1]
 
-                if num_classes != len(self.labels):
-                    raise ValueError(
-                        "Number of classes in the classifier does not match the number of labels"
-                    )
-
-                # Create flattened arrays for PyArrow table
-                filenames_repeated = np.repeat(filenames, num_classes)
-                window_ids_repeated = np.repeat(batch_ids, num_classes)
-                offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
-                logits_flat = logits.flatten()
-                labels_repeated = np.tile(self.labels, num_embeddings)
-
-                batch_table = pa.table(
-                    {
-                        "filename": filenames_repeated,
-                        "window_id": window_ids_repeated,
-                        "label": labels_repeated,
-                        "timestamp_s": offsets_repeated,
-                        "logit": logits_flat,
-                    }
+            if num_classes != len(self.labels):
+                raise ValueError(
+                    "Number of classes in the classifier does not match the number of labels"
                 )
 
-                # Accumulate tables
-                if current_table is None:
-                    current_table = batch_table
-                else:
-                    current_table = pa.concat_tables([current_table, batch_table])
+            # Create flattened arrays for PyArrow table (matching Iceberg schema)
+            filenames_repeated = np.repeat(filenames, num_classes)
+            window_ids_repeated = np.repeat(batch_ids, num_classes)
+            offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
+            logits_flat = logits.flatten().astype(np.float32)
+            labels_repeated = np.tile(self.labels, num_embeddings)
 
-                # When we have enough rows, submit write to thread pool
-                if current_table.num_rows >= table_size:
-                    write_futures.append(
-                        executor.submit(
-                            self.iceberg_write_worker,
-                            current_table,
-                            iceberg_table,
-                        )
-                    )
-                    current_table = None
+            batch_table = pa.table(
+                {
+                    "filename": filenames_repeated,
+                    "logit": logits_flat,
+                    "timestamp_s": offsets_repeated,
+                    "window_id": window_ids_repeated,
+                    "label": labels_repeated,
+                }
+            )
 
-            # Write any remaining data
-            if current_table is not None and current_table.num_rows > 0:
-                write_futures.append(
-                    executor.submit(
-                        self.iceberg_write_worker,
-                        current_table,
-                        iceberg_table,
-                    )
-                )
+            # Accumulate tables
+            if current_table is None:
+                current_table = batch_table
+            else:
+                current_table = pa.concat_tables([current_table, batch_table])
 
-            # Wait for all writes to complete
-            for f in tqdm(
-                concurrent.futures.as_completed(write_futures),
-                total=len(write_futures),
-                desc="Writing to Iceberg",
-            ):
+            # When we have enough rows, write to Iceberg
+            if current_table.num_rows >= table_size:
                 try:
-                    f.result()
+                    iceberg_table.append(current_table)
+                    print(f"Wrote {current_table.num_rows} rows to Iceberg")
+                    current_table = None
                 except Exception as e:
                     print(f"Exception writing to iceberg: {e}")
+                    raise
+
+        # Write any remaining data
+        if current_table is not None and current_table.num_rows > 0:
+            try:
+                iceberg_table.append(current_table)
+                print(f"Wrote final {current_table.num_rows} rows to Iceberg")
+            except Exception as e:
+                print(f"Exception writing final batch to iceberg: {e}")
+                raise
 
     def create_iceberg_table(self):
         """
@@ -296,10 +257,10 @@ class ClassifyFromLabels:
 
         schema = pa.schema(
             [
-                pa.field("source", pa.string()),
+                pa.field("filename", pa.string()),
                 pa.field("logit", pa.float32()),
                 pa.field("timestamp_s", pa.float32()),
-                pa.field("embedding_id", pa.int64()),
+                pa.field("window_id", pa.int64()),
                 pa.field("label", pa.string()),
             ]
         )

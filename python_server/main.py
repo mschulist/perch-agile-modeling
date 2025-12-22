@@ -420,9 +420,12 @@ async def classify_recordings(
     linear_classifier_num: None | str,
 ):
     if linear_classifier_num:
-        lc = LinearClassifier.load(f"data/classifier_params/{linear_classifier_num}_params.json")
+        lc = LinearClassifier.load(
+            f"data/classifier_params/{linear_classifier_num}_params.json"
+        )
     else:
         lc = None
+
     def classify_worker():
         # all use project 2 for now...
         hoplite_db = load_hoplite_db(2)
@@ -433,12 +436,10 @@ async def classify_recordings(
             project_id=project_id,
             warehouse_path=WAREHOUSE_PATH,
             classifier_params_path=CLASSIFIER_PARAMS_PATH,
-            linear_classifier=lc
+            linear_classifier=lc,
         )
         ice_table = classifier.create_iceberg_table()
-        classifier.threaded_classify(
-            ice_table, batch_size=16_384, max_workers=12, table_size=500_000_000
-        )
+        classifier.threaded_classify(ice_table, batch_size=16_384, table_size=500_000)
         print("Finished classifying")
 
     background_tasks.add_task(classify_worker)
@@ -532,6 +533,7 @@ async def get_classifier_results(
         classifier_run_id=classifier_run_id,
     )
     return examine_classify.get_classifier_results()
+
 
 @app.get("/")
 async def status_method():
