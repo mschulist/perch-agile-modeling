@@ -1,4 +1,3 @@
-import tempfile
 from typing import Iterator, List, Optional, Tuple
 import numpy as np
 import pyiceberg.table
@@ -16,7 +15,6 @@ from python_server.lib.models import (
     ClassifierResult,
     ClassifierResultResponse,
     ClassifierRun,
-    PossibleExample,
 )
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
@@ -24,17 +22,12 @@ from python_server.lib.perch_utils.search import (
 )
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 from datetime import datetime
-from scipy.io import wavfile
-import matplotlib.pyplot as plt
-import librosa.display as librosa_display
 
 import pyarrow as pa
 from tqdm import tqdm
 from etils import epath
 
-from perch_hoplite.agile import classifier_data, classifier, embedding_display
-from perch_hoplite.db import interface
-from perch_hoplite import audio_io as audio_utils
+from perch_hoplite.agile import classifier_data, classifier
 from ml_collections import config_dict
 
 THROWAWAY_CLASSES = set("review")
@@ -357,6 +350,7 @@ class SearchClassifications:
 
         # if we are getting the max logits from the range, scanning cannot do that
         # so we need to get all of the records and then select the max "manually"
+        # TODO: make this faster...
         limit = num_per_logit_range if not max_logits else None
         for label in labels:
             existing_embed_ids_for_label = (
@@ -398,41 +392,7 @@ class SearchClassifications:
         save the audio and image results to the precompute search directory
         """
         window = self.hoplite_db.get_window(window_id)
-
-        possible_example = self.db.get_possible_example_by_embed_id(
-            window_id, self.project_id
-        )
-
         recording = self.hoplite_db.get_recording(window.recording_id)
-
-        if possible_example is None or possible_example.id is None:
-            # We need to add the classifier result to the possible_examples and finished_possible_examples
-            # table so that IF we label the example, the precomputed spectrogram and audio are already there
-
-            possible_example = PossibleExample(
-                project_id=self.project_id,
-                score=logit,
-                embedding_id=window_id,
-                timestamp_s=window.offsets[0],
-                filename=recording.filename,
-            )
-            self.db.add_possible_example(possible_example)
-
-            # we need to get the example from the db to get the id
-            possible_example = self.db.get_possible_example_by_embed_id(
-                window_id, self.project_id
-            )
-            if possible_example is None:
-                raise ValueError("Failed to get possible example from the database.")
-            if possible_example.id is None:
-                raise ValueError(
-                    "Failed to get possible example from the database. Must have an ID."
-                )
-            self.db.finish_possible_example(possible_example)
-
-            self.flush_classify_result_to_disk(window, possible_example.id)
-
-        # Now that the example is entered as a possible example, we can enter it as a classifier result
 
         classifier_result = ClassifierResult(
             filename=recording.filename,
@@ -442,63 +402,9 @@ class SearchClassifications:
             label=label,
             project_id=self.project_id,
             classifier_run_id=self.classifier_run_id,
-            possible_example_id=possible_example.id,
+            possible_example_id=-1,  # no longer used
         )
         self.db.add_classifier_result(classifier_result)
-
-    def flush_classify_result_to_disk(
-        self, window: interface.Window, possible_example_id: int
-    ):
-        """
-        Save the audio and image results to the precompute classify directory.
-
-        We use the possible example id so that we do not need to write the file twice.
-
-        Args:
-            embedding_source: The embedding source to save the audio and image for.
-            possible_example_id: Id of the possible example in the database.
-        """
-        # First, load the audio and save it to the precompute classify directory
-        # we can reuse the same function even though it probably is not named correctly
-        audio_output_filepath = get_possible_example_audio_path(
-            possible_example_id, self.precompute_search_dir
-        )
-
-        audio_slice = audio_utils.load_audio_window_soundfile(
-            f"{self.base_path}/{self.hoplite_db.get_recording(window.recording_id).filename}",
-            offset_s=window.offsets[0],
-            window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
-            sample_rate=self.sample_rate,
-        )
-
-        with tempfile.NamedTemporaryFile() as tmp_file:
-            wavfile.write(tmp_file.name, self.sample_rate, np.float32(audio_slice))
-            epath.Path(tmp_file.name).copy(audio_output_filepath)
-
-        # Second, get the spectrogram and save it to the precompute classify directory
-        image_output_filepath = get_possible_example_image_path(
-            possible_example_id, self.precompute_search_dir
-        )
-
-        melspec_layer = embedding_display.get_melspec_layer(self.sample_rate)
-        if audio_slice.shape[0] < self.sample_rate / 100 + 1:
-            # Center pad if audio is too short.
-            zs = np.zeros([self.sample_rate // 10], dtype=audio_slice.dtype)
-            audio_slice = np.concatenate([zs, audio_slice, zs], axis=0)
-        melspec = melspec_layer(audio_slice).T  # type: ignore
-
-        librosa_display.specshow(
-            melspec,
-            sr=self.sample_rate,
-            y_axis="mel",
-            x_axis="time",
-            hop_length=self.sample_rate // 100,
-            cmap="Greys",
-        )
-        plt.gca().invert_yaxis()
-        with epath.Path(image_output_filepath).open("wb") as f:
-            plt.savefig(f)
-        plt.close()
 
 
 class ExamineClassifications:
@@ -525,17 +431,13 @@ class ExamineClassifications:
         )
         classifier_results: List[ClassifierResultResponse] = []
         for result in results:
-            if result.possible_example_id is None:
-                raise ValueError("Result possible example id is None")
             if result.project_id is None:
-                raise ValueError("Result project id is None")
-
+                raise ValueError(f"classifier result project id is None: {result}")
             annotated_labels = [
                 label.label
                 for label in self.hoplite_db.get_all_annotations(
                     config_dict.create(eq=dict(window_id=result.embedding_id))
                 )
-                # label.label for label in self.hoplite_db.get_labels(result.embedding_id)
             ]
             classifier_results.append(
                 ClassifierResultResponse(

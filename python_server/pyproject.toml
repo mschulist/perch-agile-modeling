@@ -17,7 +17,8 @@ dependencies = [
     "tqdm>=4.67.1",
     "jupyter-server>=2.17.0",
     "tensorflow>=2.20.0",
+    "polars>=1.36.1",
 ]
 
 [tool.uv.sources]
-perch-hoplite = { git = "https://github.com/google-research/perch-hoplite", rev = "e468adb45b6531e734649122bf7cf596527ce64e" }
+perch-hoplite = { git = "https://github.com/mschulist/perch-hoplite", rev = "a366dafa7955d0b5f6eaf43f0660aa25fe73b35c" }
