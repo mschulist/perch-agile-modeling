@@ -417,7 +417,7 @@ async def recordings_summary(
 async def classify_recordings(
     project_id: Annotated[int, Depends(authorize_project_access)],
     background_tasks: BackgroundTasks,
-    linear_classifier_num: None | str,
+    linear_classifier_num: None | str = None,
 ):
     if linear_classifier_num:
         lc = LinearClassifier.load(
@@ -439,7 +439,7 @@ async def classify_recordings(
             linear_classifier=lc,
         )
         ice_table = classifier.create_iceberg_table()
-        classifier.threaded_classify(ice_table, batch_size=16_384, table_size=500_000)
+        classifier.threaded_classify(ice_table, batch_size=32768, table_size=2_000_000)
         print("Finished classifying")
 
     background_tasks.add_task(classify_worker)

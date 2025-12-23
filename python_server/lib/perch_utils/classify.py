@@ -86,7 +86,7 @@ class ClassifyFromLabels:
         self.warehouse_path = warehouse_path
         self.classifier_params_path = epath.Path(classifier_params_path)
 
-        self.datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         self.labels = tuple(
             [x for x in self.hoplite_db.get_all_labels() if x not in THROWAWAY_CLASSES]
@@ -108,7 +108,7 @@ class ClassifyFromLabels:
         return classifier_data.AgileDataManager(
             target_labels=self.labels,
             db=self.hoplite_db,
-            train_ratio=0.9,
+            train_ratio=0.5,
             min_eval_examples=1,
             batch_size=128,
             weak_negatives_batch_size=128,
@@ -145,7 +145,8 @@ class ClassifyFromLabels:
         )
         np.savez(
             self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
-            *eval_scores,
+            **eval_scores,
+            allow_pickle=True,
         )
 
         return linear_classifier, eval_scores
@@ -412,7 +413,7 @@ class SearchClassifications:
                 project_id=self.project_id,
                 score=logit,
                 embedding_id=window_id,
-                timestamp_s=recording.offsets[0],
+                timestamp_s=window.offsets[0],
                 filename=recording.filename,
             )
             self.db.add_possible_example(possible_example)
