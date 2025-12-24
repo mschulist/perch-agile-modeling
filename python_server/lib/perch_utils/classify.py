@@ -1,3 +1,4 @@
+import os
 from typing import Iterator, List, Optional, Tuple
 import numpy as np
 from python_server.lib.auth import get_temp_gs_url
@@ -96,12 +97,12 @@ class ClassifyFromLabels:
         return classifier_data.AgileDataManager(
             target_labels=self.labels,
             db=self.hoplite_db,
-            train_ratio=0.5,
+            train_ratio=0.8,
             min_eval_examples=1,
             batch_size=128,
             weak_negatives_batch_size=128,
             rng=np.random.default_rng(),
-            max_train_examples_per_label=15,
+            max_train_examples_per_label=20,
         )
 
     def train_classifier(self, data_manager: classifier_data.AgileDataManager):
@@ -115,7 +116,7 @@ class ClassifyFromLabels:
             data_manager=data_manager,
             learning_rate=1e-3,
             weak_neg_weight=0.00,
-            num_train_steps=128,
+            num_train_steps=192,
         )
 
         classifier_run = ClassifierRun(
@@ -132,11 +133,13 @@ class ClassifyFromLabels:
         if classifier_run_id is None:
             raise ValueError("classifier run id is None")
 
+        os.mkdir(self.classify_path / str(classifier_run_id))
+
         linear_classifier.save(
             str(get_classifier_params_path(self.classify_path, classifier_run_id))
         )
         np.savez(
-            str(get_classifier_params_path(self.classify_path, classifier_run_id)),
+            str(get_eval_metrics_path(self.classify_path, classifier_run_id)),
             **eval_scores,
             allow_pickle=True,
         )
@@ -160,7 +163,7 @@ class ClassifyFromLabels:
         # Get all window ids to classify
         window_ids = np.array(self.hoplite_db.match_window_ids())
 
-        schema = pa.schema(
+        arrow_schema = pa.schema(
             [
                 pa.field("filename", pa.string()),
                 pa.field("logit", pa.float32()),
@@ -179,7 +182,7 @@ class ClassifyFromLabels:
 
         writer = pq.ParquetWriter(
             get_classifier_predictions_path(self.classify_path, classifier_run_id),
-            schema,
+            arrow_schema,
             compression="zstd",
         )
 
@@ -217,18 +220,17 @@ class ClassifyFromLabels:
             logits_flat = logits.flatten().astype(np.float32)
             labels_repeated = np.tile(self.labels, num_embeddings)
 
-            batch_table = pl.DataFrame(
+            arrow_table = pa.table(
                 {
-                    "filename": filenames_repeated,
-                    "logit": logits_flat,
-                    "timestamp_s": offsets_repeated,
-                    "window_id": window_ids_repeated,
-                    "label": labels_repeated,
+                    "filename": pa.array(filenames_repeated, type=pa.string()),
+                    "logit": pa.array(logits_flat, type=pa.float32()),
+                    "timestamp_s": pa.array(offsets_repeated, type=pa.float32()),
+                    "window_id": pa.array(window_ids_repeated, type=pa.int64()),
+                    "label": pa.array(labels_repeated, type=pa.string()),
                 },
-                schema=schema,
+                schema=arrow_schema,
             )
-
-            writer.write_table(batch_table.to_arrow())
+            writer.write_table(arrow_table)
 
 
 class SearchClassifications:
