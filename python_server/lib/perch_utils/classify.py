@@ -1,14 +1,5 @@
 from typing import Iterator, List, Optional, Tuple
 import numpy as np
-import pyiceberg.table
-from pyiceberg.catalog.sql import SqlCatalog
-from pyiceberg.expressions import (
-    LessThanOrEqual,
-    And,
-    GreaterThanOrEqual,
-    EqualTo,
-    NotIn,
-)
 from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from python_server.lib.models import (
@@ -24,6 +15,8 @@ from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 from datetime import datetime
 
 import pyarrow as pa
+import pyarrow.parquet as pq
+import polars as pl
 from tqdm import tqdm
 from etils import epath
 
@@ -51,6 +44,10 @@ def get_classifier_params_path(params_path: str | epath.Path, run_id: int):
     return epath.Path(params_path) / f"{run_id}_params.json"
 
 
+def get_classifier_predictions_path(classify_path: str | epath.Path, run_id: int):
+    return epath.Path(classify_path) / str(run_id) / "predictions.parquet"
+
+
 def batched_embedding_iterator(
     db: SQLiteUsearchDBExt,
     window_ids: np.ndarray,
@@ -69,15 +66,13 @@ class ClassifyFromLabels:
         db: AccountsDB,
         hoplite_db: SQLiteUsearchDBExt,
         project_id: int,
-        warehouse_path: str,
-        classifier_params_path: str,
+        classify_path: str,
         linear_classifier: classifier.LinearClassifier | None = None,
     ):
         self.db = db
         self.hoplite_db = hoplite_db
         self.project_id = project_id
-        self.warehouse_path = warehouse_path
-        self.classifier_params_path = epath.Path(classifier_params_path)
+        self.classify_path = epath.Path(classify_path)
 
         self.datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -133,11 +128,14 @@ class ClassifyFromLabels:
             self.datetime, self.project_id
         )
 
+        if classifier_run_id is None:
+            raise ValueError("classifier run id is None")
+
         linear_classifier.save(
-            str(self.classifier_params_path / f"{classifier_run_id}_params.json")
+            str(get_classifier_params_path(self.classify_path, classifier_run_id))
         )
         np.savez(
-            self.classifier_params_path / f"{classifier_run_id}_eval_scores.npz",
+            str(get_classifier_params_path(self.classify_path, classifier_run_id)),
             **eval_scores,
             allow_pickle=True,
         )
@@ -146,9 +144,7 @@ class ClassifyFromLabels:
 
     def threaded_classify(
         self,
-        iceberg_table: pyiceberg.table.Table,
         batch_size: int = 4096,
-        table_size: int = 100_000,
     ):
         """
         Performs classification of the embeddings in the database.
@@ -163,7 +159,28 @@ class ClassifyFromLabels:
         # Get all window ids to classify
         window_ids = np.array(self.hoplite_db.match_window_ids())
 
-        current_table = None
+        schema = pa.schema(
+            [
+                pa.field("filename", pa.string()),
+                pa.field("logit", pa.float32()),
+                pa.field("timestamp_s", pa.float32()),
+                pa.field("window_id", pa.int64()),
+                pa.field("label", pa.string()),
+            ]
+        )
+
+        classifier_run_id = self.db.get_classifier_run_id_by_datetime(
+            self.datetime, self.project_id
+        )
+
+        if classifier_run_id is None:
+            raise ValueError("classifier run id is None")
+
+        writer = pq.ParquetWriter(
+            get_classifier_predictions_path(self.classify_path, classifier_run_id),
+            schema,
+            compression="zstd",
+        )
 
         # Process embeddings in batches
         for batch_ids, batch_embs in tqdm(
@@ -193,74 +210,24 @@ class ClassifyFromLabels:
                     "Number of classes in the classifier does not match the number of labels"
                 )
 
-            # Create flattened arrays for PyArrow table (matching Iceberg schema)
             filenames_repeated = np.repeat(filenames, num_classes)
             window_ids_repeated = np.repeat(batch_ids, num_classes)
             offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
             logits_flat = logits.flatten().astype(np.float32)
             labels_repeated = np.tile(self.labels, num_embeddings)
 
-            batch_table = pa.table(
+            batch_table = pl.DataFrame(
                 {
                     "filename": filenames_repeated,
                     "logit": logits_flat,
                     "timestamp_s": offsets_repeated,
                     "window_id": window_ids_repeated,
                     "label": labels_repeated,
-                }
+                },
+                schema=schema,
             )
 
-            # Accumulate tables
-            if current_table is None:
-                current_table = batch_table
-            else:
-                current_table = pa.concat_tables([current_table, batch_table])
-
-            # When we have enough rows, write to Iceberg
-            if current_table.num_rows >= table_size:
-                try:
-                    iceberg_table.append(current_table)
-                    print(f"Wrote {current_table.num_rows} rows to Iceberg")
-                    current_table = None
-                except Exception as e:
-                    print(f"Exception writing to iceberg: {e}")
-                    raise
-
-        # Write any remaining data
-        if current_table is not None and current_table.num_rows > 0:
-            try:
-                iceberg_table.append(current_table)
-                print(f"Wrote final {current_table.num_rows} rows to Iceberg")
-            except Exception as e:
-                print(f"Exception writing final batch to iceberg: {e}")
-                raise
-
-    def create_iceberg_table(self):
-        """
-        Creates an iceberg table with the schema for the classification results
-        """
-        catalog = SqlCatalog(
-            "default",
-            **{
-                "uri": f"sqlite:///{self.warehouse_path}/pyiceberg_catalog.db",
-                "warehouse": f"file://{self.warehouse_path}",
-            },
-        )
-        if not catalog._namespace_exists(str(self.project_id)):
-            catalog.create_namespace(str(self.project_id))
-
-        schema = pa.schema(
-            [
-                pa.field("filename", pa.string()),
-                pa.field("logit", pa.float32()),
-                pa.field("timestamp_s", pa.float32()),
-                pa.field("window_id", pa.int64()),
-                pa.field("label", pa.string()),
-            ]
-        )
-        # the table name is the datetime when the classifier started to run
-        table = catalog.create_table(f"{self.project_id}.{self.datetime}", schema)
-        return table
+            writer.write_table(batch_table.to_arrow())
 
 
 class SearchClassifications:
@@ -277,28 +244,21 @@ class SearchClassifications:
         hoplite_db: SQLiteUsearchDBExt,
         classify_datetime: str,
         project_id: int,
-        warehouse_path: str,
-        precompute_search_dir: str,
-        classifier_params_path: str,
-        sample_rate: int = 32000,
+        classify_path: str,
     ):
         """
         classify_datetime: datetime when the classification was run
         """
         self.db = db
         self.project_id = project_id
-        self.warehouse_path = warehouse_path
-        self.precompute_search_dir = epath.Path(precompute_search_dir)
         self.classify_datetime = classify_datetime
-        self.sample_rate = sample_rate
+        self.classify_path = epath.Path(classify_path)
         self.hoplite_db = hoplite_db
-        self.classifier_params_path = epath.Path(classifier_params_path)
 
         self.base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0][  # type: ignore
             "base_path"
         ]
 
-        self.iceberg_table = self.get_iceberg_table()
         classifier_run_id = self.db.get_classifier_run_id_by_datetime(
             self.classify_datetime, self.project_id
         )
@@ -307,23 +267,17 @@ class SearchClassifications:
         self.classifier_run_id = classifier_run_id
 
         self.linear_model = classifier.LinearClassifier.load(
-            str(self.classifier_params_path / f"{self.classifier_run_id}_params.json")
+            str(get_classifier_params_path(self.classify_path, self.classifier_run_id))
         )
         self.all_labels = self.linear_model.classes
 
-    def get_iceberg_table(self):
-        """
-        Get the iceberg table
-        """
-        catalog = SqlCatalog(
-            "default",
-            **{
-                "uri": f"sqlite:///{self.warehouse_path}/pyiceberg_catalog.db",
-                "warehouse": f"file://{self.warehouse_path}",
-            },
+        self.lazy_table = pl.scan_parquet(
+            str(
+                get_classifier_predictions_path(
+                    self.classify_path, self.classifier_run_id
+                )
+            )
         )
-        table = catalog.load_table(f"{self.project_id}.{self.classify_datetime}")
-        return table
 
     def precompute_classify_results(
         self,
@@ -351,7 +305,7 @@ class SearchClassifications:
         # if we are getting the max logits from the range, scanning cannot do that
         # so we need to get all of the records and then select the max "manually"
         # TODO: make this faster...
-        limit = num_per_logit_range if not max_logits else None
+        limit = num_per_logit_range
         for label in labels:
             existing_embed_ids_for_label = (
                 self.db.get_precompute_classify_embed_ids_by_label(
@@ -361,22 +315,18 @@ class SearchClassifications:
             )
             for logit_range in logit_ranges:
                 start, end = logit_range
-                table = self.iceberg_table.scan(
-                    row_filter=And(
-                        GreaterThanOrEqual("logit", start),
-                        LessThanOrEqual("logit", end),
-                        EqualTo("label", label),
-                        NotIn("window_id", existing_embed_ids_for_label),
-                    ),
-                    limit=limit,
-                ).to_pandas()
-                if max_logits:
-                    table = (
-                        table.sort_values(by="logit", ascending=False)
-                        .reset_index()
-                        .iloc[0 : min(num_per_logit_range, table.shape[0])]
+                table = (
+                    self.lazy_table.filter(
+                        (pl.col("logit") > start)
+                        & (pl.col("logit") < end)
+                        & (pl.col("label") == label)
+                        & ~(pl.col("window_id").is_in(existing_embed_ids_for_label))
                     )
-                for _, row in table.iterrows():
+                    .head(limit)
+                    .collect()
+                )
+
+                for row in table.iter_rows(named=True):
                     window_id = row["window_id"]
                     logit = row["logit"]
                     label = row["label"]

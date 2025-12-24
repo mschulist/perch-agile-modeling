@@ -60,6 +60,7 @@ PRECOMPUTE_SEARCH_DIR = "data/precomputed_windows"
 TARGET_EXAMPLES_DIR = "data/target_examples"
 WAREHOUSE_PATH = "data/warehouse"
 CLASSIFIER_PARAMS_PATH = "data/classifier_params"
+CLASSIFY_PATH = "data/classify"
 ARU_DATA_DIR = "/home/mschulist/caples_sound/ARU_data_all"
 
 app = FastAPI()
@@ -434,12 +435,10 @@ async def classify_recordings(
             db=accounts_db,
             hoplite_db=hoplite_db,
             project_id=project_id,
-            warehouse_path=WAREHOUSE_PATH,
-            classifier_params_path=CLASSIFIER_PARAMS_PATH,
+            classify_path=CLASSIFY_PATH,
             linear_classifier=lc,
         )
-        ice_table = classifier.create_iceberg_table()
-        classifier.threaded_classify(ice_table, batch_size=32768, table_size=2_000_000)
+        classifier.threaded_classify(batch_size=32768)
         print("Finished classifying")
 
     background_tasks.add_task(classify_worker)
@@ -473,9 +472,7 @@ async def search_classified_recordings(
             hoplite_db=hoplite_db,
             classify_datetime=classified_datetime,
             project_id=project_id,
-            warehouse_path=WAREHOUSE_PATH,
-            precompute_search_dir=PRECOMPUTE_SEARCH_DIR,
-            classifier_params_path=CLASSIFIER_PARAMS_PATH,
+            classify_path=CLASSIFY_PATH,
         )
         examine_classified.precompute_classify_results(
             logit_ranges=logit_ranges,
@@ -502,11 +499,11 @@ async def get_run_classifiers(
         if run.id is None:
             raise HTTPException(status_code=400)
         eval_metrics_npz = np.load(
-            get_eval_metrics_path(CLASSIFIER_PARAMS_PATH, run.id)
+            get_eval_metrics_path(CLASSIFY_PATH, run.id)
         )
         eval_metrics = convert_eval_metrics_to_json(eval_metrics_npz)
         classes = LinearClassifier.load(
-            str(get_classifier_params_path(CLASSIFIER_PARAMS_PATH, run.id))
+            str(get_classifier_params_path(CLASSIFY_PATH, run.id))
         ).classes
         runs_response.append(
             ClassifierRunResponse(
