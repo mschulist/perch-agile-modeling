@@ -2934,7 +2934,7 @@ wheels = [
 [[package]]
 name = "perch-hoplite"
 version = "1.0.0.dev1"
-source = { git = "https://github.com/mschulist/perch-hoplite?rev=a366dafa7955d0b5f6eaf43f0660aa25fe73b35c#a366dafa7955d0b5f6eaf43f0660aa25fe73b35c" }
+source = { git = "https://github.com/mschulist/perch-hoplite?rev=ebddfc071f3147bbcf672e2aec55b0fc98291705#ebddfc071f3147bbcf672e2aec55b0fc98291705" }
 dependencies = [
     { name = "absl-py" },
     { name = "etils", extra = ["epath"] },
@@ -3641,7 +3641,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
     { name = "jax", specifier = ">=0.4.35" },
     { name = "jupyter-server", specifier = ">=2.17.0" },
-    { name = "perch-hoplite", git = "https://github.com/mschulist/perch-hoplite?rev=a366dafa7955d0b5f6eaf43f0660aa25fe73b35c" },
+    { name = "perch-hoplite", git = "https://github.com/mschulist/perch-hoplite?rev=ebddfc071f3147bbcf672e2aec55b0fc98291705" },
     { name = "polars", specifier = ">=1.36.1" },
     { name = "pyiceberg", specifier = ">=0.8.0" },
     { name = "pyjwt", specifier = ">=2.10.1" },

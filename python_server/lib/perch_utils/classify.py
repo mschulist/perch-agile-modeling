@@ -101,6 +101,7 @@ class ClassifyFromLabels:
             batch_size=128,
             weak_negatives_batch_size=128,
             rng=np.random.default_rng(),
+            max_train_examples_per_label=15,
         )
 
     def train_classifier(self, data_manager: classifier_data.AgileDataManager):
@@ -113,7 +114,7 @@ class ClassifyFromLabels:
         linear_classifier, eval_scores = classifier.train_linear_classifier(
             data_manager=data_manager,
             learning_rate=1e-3,
-            weak_neg_weight=0.05,
+            weak_neg_weight=0.00,
             num_train_steps=128,
         )
 
