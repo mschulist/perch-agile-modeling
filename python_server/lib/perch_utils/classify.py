@@ -32,7 +32,7 @@ def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
     """
     if str(params_path).startswith("gs://"):
         return get_temp_gs_url(f"{str(params_path)}/{run_id}_eval_scores.npz")
-    return epath.Path(params_path) / f"{run_id}_eval_scores.npz"
+    return epath.Path(params_path) / str(run_id) / f"{run_id}_eval_scores.npz"
 
 
 def get_classifier_params_path(params_path: str | epath.Path, run_id: int):
@@ -41,7 +41,7 @@ def get_classifier_params_path(params_path: str | epath.Path, run_id: int):
     """
     if str(params_path).startswith("gs://"):
         return get_temp_gs_url(f"{str(params_path)}/{run_id}_params.json")
-    return epath.Path(params_path) / f"{run_id}_params.json"
+    return epath.Path(params_path) / str(run_id) / f"{run_id}_params.json"
 
 
 def get_classifier_predictions_path(classify_path: str | epath.Path, run_id: int):
@@ -392,7 +392,7 @@ class ExamineClassifications:
             classifier_results.append(
                 ClassifierResultResponse(
                     annotated_labels=annotated_labels,
-                    id=result.possible_example_id,
+                    id=result.id if result.id else -1,
                     embedding_id=result.embedding_id,
                     label=result.label,
                     logit=result.logit,
@@ -402,14 +402,14 @@ class ExamineClassifications:
                     classifier_run_id=result.classifier_run_id,
                     image_path=str(
                         get_possible_example_image_path(
-                            result.possible_example_id,
+                            result.embedding_id,
                             self.precompute_search_dir,
                             temp_url=True,
                         )
                     ),
                     audio_path=str(
                         get_possible_example_audio_path(
-                            result.possible_example_id,
+                            result.embedding_id,
                             self.precompute_search_dir,
                             temp_url=True,
                         )
