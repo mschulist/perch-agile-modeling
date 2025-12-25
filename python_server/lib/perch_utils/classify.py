@@ -24,7 +24,7 @@ from etils import epath
 from perch_hoplite.agile import classifier_data, classifier
 from ml_collections import config_dict
 
-THROWAWAY_CLASSES = set("review")
+THROWAWAY_CLASSES = {"review"}
 
 
 def get_eval_metrics_path(params_path: str | epath.Path, run_id: int):
@@ -80,6 +80,7 @@ class ClassifyFromLabels:
         self.labels = tuple(
             [x for x in self.hoplite_db.get_all_labels() if x not in THROWAWAY_CLASSES]
         )
+        print(self.labels)
 
         self.data_manager = self.get_data_manager()
 
@@ -318,16 +319,19 @@ class SearchClassifications:
             )
             for logit_range in logit_ranges:
                 start, end = logit_range
-                table = (
-                    self.lazy_table.filter(
-                        (pl.col("logit") > start)
-                        & (pl.col("logit") < end)
-                        & (pl.col("label") == label)
-                        & ~(pl.col("window_id").is_in(existing_embed_ids_for_label))
-                    )
-                    .head(limit)
-                    .collect()
+                query = self.lazy_table.filter(
+                    (pl.col("logit") > start)
+                    & (pl.col("logit") < end)
+                    & (pl.col("label") == label)
+                    & ~(pl.col("window_id").is_in(existing_embed_ids_for_label))
                 )
+
+                if max_logits:
+                    # Sort by logit descending and take top results
+                    table = query.sort("logit", descending=True).head(limit).collect()
+                else:
+                    # Just take first N results
+                    table = query.head(limit).collect()
 
                 for row in table.iter_rows(named=True):
                     window_id = row["window_id"]
