@@ -16,7 +16,7 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "tqdm>=4.67.1",
     "jupyter-server>=2.17.0",
-    "tensorflow>=2.20.0",
+    "tensorflow[and-cuda]>=2.20.0",
     "polars>=1.36.1",
 ]
 

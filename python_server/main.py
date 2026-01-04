@@ -25,6 +25,8 @@ from python_server.lib.perch_utils.summary import get_summary
 
 from perch_hoplite.agile.classifier import LinearClassifier
 
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
+
 from .lib.perch_utils.embeddings import convert_legacy_tfrecords
 
 from .lib.perch_utils.projects import load_hoplite_db, setup_hoplite_db
@@ -77,8 +79,18 @@ db = AccountsDB()
 db.create_db_and_tables()
 projects = db.get_all_projects()
 
-# all projects are under a single hoplite db, v2
-hoplite_db = load_hoplite_db(2)
+hoplite_dbs: dict[int, SQLiteUsearchDBExt] = {}
+
+for project in projects:
+    if project.id is None:
+        continue
+    hoplite_dbs[project.id] = load_hoplite_db(project.id)
+
+
+def get_hoplite_db(project_id: int):
+    if project_id not in hoplite_dbs:
+        hoplite_dbs[project_id] = load_hoplite_db(project_id)
+    return hoplite_dbs[project_id]
 
 
 def authorize_project_access(
@@ -229,6 +241,7 @@ async def get_next_possible_example(
 
     We will return the {audio, image, possible_label, score, filename, timestamp_s} of the next possible example.
     """
+    hoplite_db = get_hoplite_db(project_id)
 
     annotate = AnnotatePossibleExamples(
         db=db,
@@ -252,9 +265,11 @@ async def get_file(filename: str):
     if epath.Path(filename).exists():
         return FileResponse(filename)
 
-    # TODO: check to see if we have precomputed the file.
+    # check to see if we have precomputed the file.
     # if not, then precompute it before returning
     window_id = int(filename.split("/")[-1].split(".")[0])
+    # TODO: make the project_id a param to this route
+    hoplite_db = get_hoplite_db(2)
     window = hoplite_db.get_window(window_id)
     recording = hoplite_db.get_recording(window.recording_id)
 
@@ -303,7 +318,7 @@ async def annotate_example(
     """
     Given a user and project (that they are a part of), annotate an example with the given labels.
     """
-
+    hoplite_db = get_hoplite_db(project_id)
     annotate = AnnotatePossibleExamples(
         db=db,
         hoplite_db=hoplite_db,
@@ -321,6 +336,7 @@ async def get_label_summary(
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: Annotated[int, Depends(authorize_project_access)],
 ):
+    hoplite_db = get_hoplite_db(project_id)
     explore = ExploreAnnotations(
         db=db,
         hoplite_db=hoplite_db,  # type: ignore
@@ -338,6 +354,7 @@ async def get_annotations_by_label(
     project_id: Annotated[int, Depends(authorize_project_access)],
     label: str,
 ):
+    hoplite_db = get_hoplite_db(project_id)
     explore = ExploreAnnotations(
         db=db,
         hoplite_db=hoplite_db,
@@ -359,6 +376,7 @@ async def relabel_example(
     """
     Given a user and project (that they are a part of), relabel an example with the given labels.
     """
+    hoplite_db = get_hoplite_db(project_id)
 
     explore = ExploreAnnotations(
         db=db,
@@ -388,6 +406,8 @@ async def add_legacy_labels(
     if current_user.id not in allowed_users:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    hoplite_db = get_hoplite_db(project_id)
+
     legacy_labels = LegacyLabels(
         db=db,
         hoplite_db=hoplite_db,
@@ -409,6 +429,7 @@ async def all_species_codes():
 async def recordings_summary(
     project_id: Annotated[int, Depends(authorize_project_access)],
 ):
+    hoplite_db = get_hoplite_db(project_id)
     summary = get_summary(project_id, db, hoplite_db)
     print(summary)
     return summary
@@ -429,7 +450,7 @@ async def classify_recordings(
 
     def classify_worker():
         # all use project 2 for now...
-        hoplite_db = load_hoplite_db(2)
+        hoplite_db = load_hoplite_db(project_id)
         accounts_db = AccountsDB()
         classifier = ClassifyFromLabels(
             db=accounts_db,
@@ -498,9 +519,7 @@ async def get_run_classifiers(
     for run in runs:
         if run.id is None:
             raise HTTPException(status_code=400)
-        eval_metrics_npz = np.load(
-            get_eval_metrics_path(CLASSIFY_PATH, run.id)
-        )
+        eval_metrics_npz = np.load(get_eval_metrics_path(CLASSIFY_PATH, run.id))
         eval_metrics = convert_eval_metrics_to_json(eval_metrics_npz)
         classes = LinearClassifier.load(
             str(get_classifier_params_path(CLASSIFY_PATH, run.id))
@@ -522,6 +541,7 @@ async def get_classifier_results(
     project_id: Annotated[int, Depends(authorize_project_access)],
     classifier_run_id: int,
 ):
+    hoplite_db = get_hoplite_db(project_id)
     examine_classify = ExamineClassifications(
         db=db,
         hoplite_db=hoplite_db,

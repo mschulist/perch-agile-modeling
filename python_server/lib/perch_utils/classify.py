@@ -116,8 +116,8 @@ class ClassifyFromLabels:
         linear_classifier, eval_scores = classifier.train_linear_classifier(
             data_manager=data_manager,
             learning_rate=1e-3,
-            weak_neg_weight=0.00,
-            num_train_steps=192,
+            weak_neg_weight=0.05,
+            num_train_steps=256,
         )
 
         classifier_run = ClassifierRun(
