@@ -11,9 +11,9 @@ def get_summary(
     """
     num_embeddings = hoplite_db.count_embeddings()
     # num labels is the number of classes in the dataset (not the number of individual labels)
-    num_labels = hoplite_db.count_classes()
+    num_labels = len(hoplite_db.get_all_annotations())
     num_possible_examples = len(db.get_possible_examples(project_id))
-    num_source_files = hoplite_db.get_num_sources()
+    num_source_files = hoplite_db.count_recordings()
     hours_recordings = num_embeddings * 5 / 3600
 
     return RecordingsSummary(

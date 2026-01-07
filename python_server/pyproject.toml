@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "bcrypt>=4.2.1",
     "fastapi[standard]>=0.115.5",
-    "hoplite",
+    "perch-hoplite",
     "jax>=0.4.35",
     "pyiceberg>=0.8.0",
     "pyjwt>=2.10.1",
@@ -15,7 +15,10 @@ dependencies = [
     "scipy>=1.14.1",
     "sqlmodel>=0.0.22",
     "tqdm>=4.67.1",
+    "jupyter-server>=2.17.0",
+    "tensorflow[and-cuda]>=2.20.0",
+    "polars>=1.36.1",
 ]
 
 [tool.uv.sources]
-hoplite = { git = "https://github.com/google-research/hoplite" }
+perch-hoplite = { git = "https://github.com/mschulist/perch-hoplite", rev = "ebddfc071f3147bbcf672e2aec55b0fc98291705" }

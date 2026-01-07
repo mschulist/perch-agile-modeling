@@ -8,12 +8,12 @@ from python_server.lib.db.db import AccountsDB
 from python_server.lib.models import TargetRecording
 import tempfile
 from scipy.io import wavfile
-import hoplite.audio_io as audio_utils
+import perch_hoplite.audio_io as audio_utils
 from .audio_utils import slice_peaked_audio
 
 import os
 
-from hoplite.taxonomy import namespace_db
+from perch_hoplite.taxonomy import namespace_db
 
 # TARGET_RECORDINGS_PATH = epath.Path("data/target_recordings")
 

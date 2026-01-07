@@ -1,25 +1,23 @@
-import tempfile
 from typing import List, Sequence
-from scipy.io import wavfile
 
 from ml_collections import config_dict
-from librosa import display as librosa_display
-import matplotlib.pyplot as plt
 
 from python_server.lib.auth import get_temp_gs_url
 from python_server.lib.db.db import AccountsDB
 from etils import epath
-from hoplite.db import sqlite_usearch_impl, interface
-from hoplite.zoo import model_configs
-from hoplite.agile import embedding_display
-import hoplite.audio_io as audio_utils
+from perch_hoplite.zoo import model_configs
+import perch_hoplite.audio_io as audio_utils
+from perch_hoplite.db import interface
 
-from python_server.lib.models import PossibleExample, TargetRecording
+from python_server.lib.models import TargetRecording
 from python_server.lib.perch_utils.target_recordings import (
     GatherTargetRecordings,
     get_target_recording_path,
 )
-import numpy as np
+
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
+
+SEARCH_PROVENANCE = "searched_annotator"
 
 
 def get_possible_example_image_path(
@@ -52,7 +50,7 @@ class GatherPossibleExamples:
     def __init__(
         self,
         db: AccountsDB,
-        hoplite_db: sqlite_usearch_impl.SQLiteUsearchDB,
+        hoplite_db: SQLiteUsearchDBExt,
         precompute_search_dir: epath.Path | str,
         target_path: epath.Path | str,
         project_id: int,
@@ -72,7 +70,7 @@ class GatherPossibleExamples:
         model_key = perch_model_config.model_key
         if not isinstance(model_key, str):
             raise ValueError("Model key must be a string.")
-        model_class = model_configs.MODEL_CLASS_MAP[model_key]
+        model_class = model_configs.get_model_class(model_key)
         model_config = perch_model_config.model_config
         if not isinstance(model_config, config_dict.ConfigDict):
             raise ValueError("Inner nested model config must be a ConfigDict.")
@@ -120,16 +118,15 @@ class GatherPossibleExamples:
 
             # 3. Save the possible examples to the precompute search directory
             for close_result in close_results:
-                embed_id = int.from_bytes(close_result.key, "little")  # type: ignore
-                if self.db.get_possible_example_by_embed_id(embed_id, self.project_id):
+                window_id = int.from_bytes(close_result.key, "little")  # type: ignore
+                if self.db.get_possible_example_by_embed_id(window_id, self.project_id):
                     # skip if we already have this example
-                    print(f"Skipping example {embed_id} as it already exists.")
+                    print(f"Skipping example {window_id} as it already exists.")
                     continue
-                self.save_search_result(
-                    embed_id, close_result.distance, target_recording
-                )
 
-            # finish the targer recording: ie we have searched for all possible examples
+                self.save_search_result(window_id, target_recording)
+
+            # finish the target recording: ie we have searched for all possible examples
             # and do not want to search for them again using the same target recording
             if target_recording.id is None:
                 raise ValueError("Target recording must have an id.")
@@ -169,8 +166,7 @@ class GatherPossibleExamples:
 
     def save_search_result(
         self,
-        embedding_id: int,
-        score: float,
+        window_id: int,
         target_recording: TargetRecording,
     ):
         """
@@ -182,75 +178,12 @@ class GatherPossibleExamples:
             target_recording: Target recording that the search result is associated with.
         """
         # insert into database
+        window = self.hoplite_db.get_window(window_id)
 
-        source = self.hoplite_db.get_embedding_source(embedding_id)
-        possible_example = PossibleExample(
-            project_id=self.project_id,
-            score=score,
-            timestamp_s=source.offsets[0],
-            filename=source.source_id,
-            target_recording_id=target_recording.id,
-            target_recording=target_recording,
-            embedding_id=embedding_id,
+        # add an annotation with the POSSIBLE label for the window
+        self.hoplite_db.insert_annotation(
+            window.id,
+            target_recording.species,
+            interface.LabelType.POSSIBLE,
+            SEARCH_PROVENANCE,
         )
-
-        possible_example_id = self.db.add_possible_example(possible_example)
-
-        if possible_example_id is None:
-            raise ValueError("Failed to add possible example to the database.")
-
-        # save the audio and image results
-        self.flush_search_result_to_disk(source, possible_example_id)
-
-    def flush_search_result_to_disk(
-        self, embedding_source: interface.EmbeddingSource, possible_example_id: int
-    ):
-        """
-        Save the audio and image results to the precompute search directory.
-
-        Args:
-            embedding_source: Embedding source to save.
-            possible_example_id: Id of the possible example.
-        """
-        # First, load the audio and save it to the precompute search directory
-        audio_output_filepath = get_possible_example_audio_path(
-            possible_example_id, self.precompute_search_dir
-        )
-
-        audio_slice = audio_utils.load_audio_window_soundfile(
-            f"{self.base_path}/{embedding_source.source_id}",
-            offset_s=embedding_source.offsets[0],
-            window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
-            sample_rate=self.sample_rate,
-        )
-
-        with tempfile.NamedTemporaryFile() as tmp_file:
-            wavfile.write(tmp_file.name, self.sample_rate, np.float32(audio_slice))
-            epath.Path(tmp_file.name).copy(audio_output_filepath)
-
-        # Second, get the spectrogram and save it to the precompute search directory
-        image_output_filepath = get_possible_example_image_path(
-            possible_example_id, self.precompute_search_dir
-        )
-
-        melspec_layer = embedding_display.get_melspec_layer(self.sample_rate)
-        if audio_slice.shape[0] < self.sample_rate / 100 + 1:
-            # Center pad if audio is too short.
-            zs = np.zeros([self.sample_rate // 10], dtype=audio_slice.dtype)
-            audio_slice = np.concatenate([zs, audio_slice, zs], axis=0)
-        melspec = melspec_layer(audio_slice).T  # type: ignore
-
-        librosa_display.specshow(
-            melspec,
-            sr=self.sample_rate,
-            y_axis="mel",
-            x_axis="time",
-            hop_length=self.sample_rate // 100,
-            cmap="Greys",
-        )
-        # for some reason, librosa has decided to make the y-axis inverted...
-        # so we need to invert it back
-        plt.gca().invert_yaxis()
-        with epath.Path(image_output_filepath).open("wb") as f:
-            plt.savefig(f)
-        plt.close()

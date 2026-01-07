@@ -1,22 +1,23 @@
 import tempfile
-from typing import List, Optional
-from hoplite.db import interface
+from typing import List
+from perch_hoplite.db import interface
 from python_server.lib.db.db import AccountsDB
 from etils import epath
 
-from python_server.lib.models import AnnotatedRecording, PossibleExample
+from python_server.lib.models import AnnotatedWindow
 from python_server.lib.perch_utils.search import (
     get_possible_example_audio_path,
     get_possible_example_image_path,
 )
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 
-from hoplite.agile import embedding_display
-import hoplite.audio_io as audio_utils
+from perch_hoplite.agile import embedding_display
+import perch_hoplite.audio_io as audio_utils
 from scipy.io import wavfile
 from librosa import display as librosa_display
 import matplotlib.pyplot as plt
 import numpy as np
+from ml_collections import config_dict
 
 
 class ExploreAnnotations:
@@ -51,84 +52,63 @@ class ExploreAnnotations:
 
         For each species, list the number of possible examples that have been annotated.
         """
-        return self.hoplite_db.get_class_counts()
+        return self.hoplite_db.count_each_label()
 
-    def get_annotations_by_label(self, label: str) -> List[AnnotatedRecording]:
+    def get_annotations_by_label(self, label: str) -> List[AnnotatedWindow]:
         """
         Get the annotations by the given label. Here label usually corresponds to the species code
         (although it does not necessarily have to, such as an unknown label).
 
         Args:
-            species_code: The species code to get the annotations for.
+            label: The species code to get the annotations for.
 
         Returns:
-            List of AnnotatedRecordings for the given species.
+            List of AnnotatedWindows for the given species.
         """
-        embedding_ids = self.hoplite_db.get_embeddings_by_label(label=label)
-        if len(embedding_ids) == 0:
+        window_ids = self.hoplite_db.match_window_ids(
+            annotations_filter=config_dict.create(eq=dict(label=label))
+        )
+        if len(window_ids) == 0:
             return []
 
-        # we need to go through each id and find out if there are any other labels with the same embedding id
-        # if we have, then we need to get the label for that embedding id
-        # TODO: ideally, there would be a more efficient way to do this (joins in the db), but that
-        # would require changing the hoplite db interface...
+        # new hoplite DB, thanks!!
+        # Go through each window (that has been annotated with the label of interest) and
+        # find all of the annotations for that window
+        annotated_recordings: List[AnnotatedWindow] = []
+        for window_id in window_ids:
+            window = self.hoplite_db.get_window(window_id)
 
-        annotated_recordings: List[AnnotatedRecording] = []
-        for embedding_id in embedding_ids:
-            annotated_recording = self._get_annotated_recording_by_embedding_id(
-                embedding_id
-            )
-            if annotated_recording is not None:
-                annotated_recordings.append(annotated_recording)
-            else:
-                print(
-                    f"Could not find annotated recording for embedding id {embedding_id} adding it now..."
+            if window is not None:
+                recording = self.hoplite_db.get_recording(window.recording_id)
+                labels = self.hoplite_db.get_all_annotations(
+                    config_dict.create(eq=dict(window_id=window.id))
                 )
-                create_possible_example_by_embed_id(
-                    self.project_id,
-                    self.db,
-                    self.hoplite_db,
-                    embedding_id,
-                    str(self.precompute_search_dir),
+                annotated_window = AnnotatedWindow(
+                    filename=recording.filename,
+                    timestamp_s=window.offsets[0],
+                    embedding_id=window.id,
+                    species_labels=[lab.label for lab in labels],
+                    audio_path=str(
+                        get_possible_example_audio_path(
+                            window.id, self.precompute_search_dir, True
+                        )
+                    ),
+                    image_path=str(
+                        get_possible_example_image_path(
+                            window.id, self.precompute_search_dir, True
+                        )
+                    ),
+                )
+                annotated_recordings.append(annotated_window)
+            else:
+                # TODO: some handling here, maybe not needed after full switch to new hoplite DB
+                raise ValueError(
+                    f"Could not find annotated recording for embedding id {window_id}"
                 )
 
         return annotated_recordings
 
-    def _get_annotated_recording_by_embedding_id(
-        self, embedding_id: int
-    ) -> Optional[AnnotatedRecording]:
-        """
-        Helper method to get the AnnotatedRecording for the given embedding id.
-        """
-
-        labels_list: List[str] = []
-        labels = self.hoplite_db.get_labels(embedding_id=embedding_id)
-        for label in labels:
-            labels_list.append(label.label)
-
-        possible_example = self.db.get_possible_example_by_embed_id(
-            embedding_id, self.project_id
-        )
-        if possible_example is None or possible_example.id is None:
-            return None
-
-        image_path = get_possible_example_image_path(
-            possible_example.id, self.precompute_search_dir, temp_url=True
-        )
-        audio_path = get_possible_example_audio_path(
-            possible_example.id, self.precompute_search_dir, temp_url=True
-        )
-
-        return AnnotatedRecording(
-            embedding_id=embedding_id,
-            species_labels=labels_list,
-            filename=possible_example.filename,
-            timestamp_s=possible_example.timestamp_s,
-            audio_path=str(audio_path),
-            image_path=str(image_path),
-        )
-
-    def _remove_label(self, embedding_id: int, label: str):
+    def _remove_label(self, window_id: int, label: str):
         """
         Remove the given label from the given embedding id.
 
@@ -140,9 +120,24 @@ class ExploreAnnotations:
             embedding_id: The embedding id to remove the label from.
             label: The label to remove.
         """
-        self.hoplite_db.remove_label(embedding_id, label)
 
-    def change_annotation(self, embedding_id: int, new_labels: List[str]):
+        # first get the annotation that matches the window_id and label
+        annotations = self.hoplite_db.get_all_annotations(
+            config_dict.create(eq=dict(window_id=window_id, label=label))
+        )
+        # make sure that we have a single annotation
+        if len(annotations) == 0:
+            print(
+                f"no annotation with window_id={window_id}, label={label}, so this is a no op"
+            )
+            return
+        if len(annotations) > 1:
+            raise ValueError(
+                f"there is more than one annoation with window_id={window_id}, label={label}"
+            )
+        self.hoplite_db.remove_annotation(annotations[0].id)
+
+    def change_annotation(self, window_id: int, new_labels: List[str]):
         """
         Change the annotation for the given embedding id from the to the new labels.
 
@@ -157,7 +152,10 @@ class ExploreAnnotations:
             new_labels: The new labels to change to.
         """
         old_labels_set = {
-            x.label for x in self.hoplite_db.get_labels(embedding_id=embedding_id)
+            x.label
+            for x in self.hoplite_db.get_all_annotations(
+                config_dict.create(eq=dict(window_id=window_id))
+            )
         }
         new_labels_set = set(new_labels)
 
@@ -165,77 +163,22 @@ class ExploreAnnotations:
         labels_to_add = new_labels_set - old_labels_set
 
         for label in labels_to_remove:
-            self._remove_label(embedding_id, label)
+            self._remove_label(window_id, label)
 
         for label in labels_to_add:
-            label = interface.Label(
-                embedding_id=embedding_id,
+            self.hoplite_db.insert_annotation(
+                window_id=window_id,
                 label=label,
-                type=interface.LabelType.POSITIVE,
+                label_type=interface.LabelType.POSITIVE,
                 provenance=self.provenance,
             )
-            self.hoplite_db.insert_label(label)
 
         self.hoplite_db.commit()
 
 
-def create_possible_example_by_embed_id(
-    project_id: int,
-    db: AccountsDB,
-    hoplite_db: SQLiteUsearchDBExt,
-    embedding_id: int,
-    precompute_search_dir: str,
-):
-    """
-    Helper function to create a possible example by the embedding id.
-    """
-    existing_possible_example = db.get_possible_example_by_embed_id(
-        embedding_id, project_id
-    )
-    if existing_possible_example is not None:
-        print(
-            f"Possible example with embedding id {embedding_id} already exists. Skipping..."
-        )
-        return
-    embed_source = hoplite_db.get_embedding_source(embedding_id)
-    possible_example = PossibleExample(
-        project_id=project_id,
-        score=-100,  # This is a placeholder value...
-        embedding_id=embedding_id,
-        timestamp_s=embed_source.offsets[0],
-        filename=embed_source.source_id,
-    )
-    try:
-        db.add_possible_example(possible_example)
-    except Exception as e:
-        print(f"Failed to add possible example to the database: {e}")
-        return
-
-    # now we need to get the id of the possible example
-    possible_example = db.get_possible_example_by_embed_id(embedding_id, project_id)
-    if possible_example is None:
-        print("Failed to get possible example from the database.")
-        return
-    if possible_example.id is None:
-        raise ValueError(
-            "Failed to get possible example from the database. Must have an ID."
-        )
-    db.finish_possible_example(possible_example)
-
-    base_path = hoplite_db.get_metadata("audio_sources").audio_globs[0]["base_path"]  # type: ignore
-
-    flush_example_to_disk(
-        embed_source,
-        possible_example.id,
-        precompute_search_dir,
-        sample_rate=32000,
-        base_path=base_path,
-    )
-
-
-def flush_example_to_disk(
-    embedding_source: interface.EmbeddingSource,
-    possible_example_id: int,
+def flush_window_to_disk(
+    recording: interface.Recording,
+    window: interface.Window,
     precompute_search_dir: str,
     sample_rate: int,
     base_path: str,
@@ -246,12 +189,12 @@ def flush_example_to_disk(
     # First, load the audio and save it to the precompute classify directory
     # we can reuse the same function even though it probably is not named correctly
     audio_output_filepath = get_possible_example_audio_path(
-        possible_example_id, epath.Path(precompute_search_dir)
+        window.id, epath.Path(precompute_search_dir)
     )
 
     audio_slice = audio_utils.load_audio_window_soundfile(
-        f"{base_path}/{embedding_source.source_id}",
-        offset_s=embedding_source.offsets[0],
+        f"{base_path}/{recording.filename}",
+        offset_s=window.offsets[0],
         window_size_s=5.0,  # TODO: make this a parameter, not hard coded (although probably fine)
         sample_rate=sample_rate,
     )
@@ -262,7 +205,7 @@ def flush_example_to_disk(
 
     # Second, get the spectrogram and save it to the precompute classify directory
     image_output_filepath = get_possible_example_image_path(
-        possible_example_id, epath.Path(precompute_search_dir)
+        window.id, epath.Path(precompute_search_dir)
     )
 
     melspec_layer = embedding_display.get_melspec_layer(sample_rate)
@@ -281,7 +224,6 @@ def flush_example_to_disk(
         cmap="Greys",
     )
     # for some reason librosa displays the image upside down
-    plt.gca().invert_yaxis()
     with epath.Path(image_output_filepath).open("wb") as f:
         plt.savefig(f)
     plt.close()

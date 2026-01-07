@@ -1,12 +1,13 @@
 import sqlite3
 from typing import Any
-from hoplite.db import sqlite_usearch_impl
+from perch_hoplite.db import sqlite_usearch_impl
 from ml_collections import config_dict
 import numpy as np
 from usearch import index as uindex
+from etils import epath
 
 
-class SQLiteUsearchDBExt(sqlite_usearch_impl.SQLiteUsearchDB):
+class SQLiteUsearchDBExt(sqlite_usearch_impl.SQLiteUSearchDB):
     """
     Extension of usearch hoplite db to add additional functionality.
     """
@@ -16,13 +17,19 @@ class SQLiteUsearchDBExt(sqlite_usearch_impl.SQLiteUsearchDB):
         db_path: str,
         db: sqlite3.Connection,
         ui: uindex.Index,
-        _ui_mem: uindex.Index,
-        _ui_disk_view: uindex.Index,
-        embedding_dim: int,
-        embedding_dtype: type[Any] = np.float16,
+        _embedding_dim: int,
+        _embedding_dtype: type[Any] = np.float16,
+        _ui_loaded: bool = False,
+        _ui_updated: bool = False,
     ):
         super().__init__(
-            db_path, db, ui, _ui_mem, _ui_disk_view, embedding_dim, embedding_dtype
+            db_path=epath.Path(db_path),
+            db=db,
+            ui=ui,
+            _embedding_dim=_embedding_dim,
+            _embedding_dtype=_embedding_dtype,
+            _ui_loaded=_ui_loaded,
+            _ui_updated=_ui_updated,
         )
 
     @classmethod
@@ -39,26 +46,14 @@ class SQLiteUsearchDBExt(sqlite_usearch_impl.SQLiteUsearchDB):
             db_path=db_path,
             db=sqlite_usearch.db,
             ui=sqlite_usearch.ui,
-            _ui_mem=sqlite_usearch._ui_mem,
-            _ui_disk_view=sqlite_usearch._ui_disk_view,
-            embedding_dim=sqlite_usearch.embedding_dim,
-            embedding_dtype=sqlite_usearch.embedding_dtype,
+            _embedding_dim=sqlite_usearch._embedding_dim,
+            _embedding_dtype=sqlite_usearch._embedding_dtype,
         )
 
-    def remove_label(self, embedding_id: int, label: str):
-        """
-        Remove the label from the embedding id.
-        """
-        cursor = self._get_cursor()
-        cursor.execute(
-            "DELETE FROM hoplite_labels WHERE embedding_id = ? AND label = ?",
-            (embedding_id, label),
-        )
-
-    def get_num_sources(self) -> int:
+    def count_recordings(self) -> int:
         """
         Get the number of sources in the db.
         """
         cursor = self._get_cursor()
-        cursor.execute("SELECT COUNT(*) FROM hoplite_sources")
+        cursor.execute("SELECT COUNT(*) FROM recordings")
         return cursor.fetchone()[0]

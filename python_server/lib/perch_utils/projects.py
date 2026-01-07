@@ -1,4 +1,4 @@
-from hoplite.agile import colab_utils, source_info
+from perch_hoplite.agile import colab_utils, source_info
 from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 import os
 

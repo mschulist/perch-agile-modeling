@@ -1,5 +1,5 @@
 from typing import List
-from hoplite.taxonomy import namespace_db
+from perch_hoplite.taxonomy import namespace_db
 
 
 def get_all_species_codes() -> List[str]:

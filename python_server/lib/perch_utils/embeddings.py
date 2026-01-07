@@ -1,5 +1,5 @@
 import os
-from hoplite.agile.convert_legacy import convert_tfrecords
+from perch_hoplite.agile.convert_legacy import convert_tfrecords
 
 
 def convert_legacy_tfrecords(
