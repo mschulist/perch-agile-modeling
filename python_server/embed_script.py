@@ -17,7 +17,7 @@ def embed_audio(dry_run=True):
         dataset_name="caples",
         base_path="/home/mschulist/caples_sound/ARU_data_all/",
         file_glob="*/*.wav",
-        min_audio_len_s=60,
+        min_audio_len_s=3,
     )
 
     db_path = "/home/mschulist/perch-agile-modeling/python_server/data/hoplite_db/hoplite_2.db"
