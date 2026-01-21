@@ -9,7 +9,8 @@ class Config(BaseModel):
     classifiers_dir: str
     classifier_outputs_dir: str
     precomputed_windows_dir: str
-    ARU_data_glob: str
+    ARU_file_glob: str
+    ARU_base_path: str
     db_path: str
     throwaway_classes: list[str]
     hoplite_db_path: str
@@ -18,6 +19,7 @@ class Config(BaseModel):
     learning_rate: float
     weak_neg_rate: float
     num_train_steps: int
+    embedding_model: str
 
     def to_file(self):
         with open(self.config_path, "w") as f:
