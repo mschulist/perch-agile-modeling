@@ -5,7 +5,12 @@ description = "Program to build bioacoustics classifiers"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "perch-hoplite",
     "pydantic>=2.12.5",
     "pytest>=9.0.2",
     "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0.46",
 ]
+
+[tool.uv.sources]
+perch-hoplite = { git = "https://github.com/google-research/perch-hoplite.git" }
