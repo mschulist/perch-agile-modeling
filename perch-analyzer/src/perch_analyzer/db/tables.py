@@ -1,9 +1,7 @@
 from sqlalchemy import ForeignKey
-from sqlalchemy import String
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
 
 
 class Base(DeclarativeBase):
@@ -16,6 +14,13 @@ class Classifier(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     datetime: Mapped[str] = mapped_column()
     embedding_model: Mapped[str] = mapped_column()
+    labels: Mapped[tuple[str, ...]] = mapped_column()
+    train_ratio: Mapped[float] = mapped_column()
+    rng: Mapped[int | None] = mapped_column(nullable=True)
+    max_train_examples_per_label: Mapped[int] = mapped_column()
+    learning_rate: Mapped[float] = mapped_column()
+    weak_neg_rate: Mapped[float] = mapped_column()
+    num_train_steps: Mapped[int] = mapped_column()
 
 
 class ClassifierOutput(Base):

@@ -25,6 +25,13 @@ class Classifier(BaseModel):
     id: int
     datetime: dt
     embedding_model: str
+    labels: tuple[str, ...]
+    train_ratio: float
+    rng: int | None
+    max_train_examples_per_label: int
+    learning_rate: float
+    weak_neg_rate: float
+    num_train_steps: float
     metrics: dict[str, Any]  # TODO: make this an object, not a dict
     linear_classifier: classifier.LinearClassifier
 
@@ -61,13 +68,40 @@ class AnalyzerDB:
                 embedding_model=db_classifier.embedding_model,
                 linear_classifier=linear_classifier,
                 metrics=metrics,
+                labels=db_classifier.labels,
+                num_train_steps=db_classifier.num_train_steps,
+                learning_rate=db_classifier.learning_rate,
+                rng=db_classifier.rng,
+                train_ratio=db_classifier.train_ratio,
+                max_train_examples_per_label=db_classifier.max_train_examples_per_label,
+                weak_neg_rate=db_classifier.weak_neg_rate,
             )
 
-    def insert_classifier(self, classifier: Classifier) -> int:
+    def insert_classifier(
+        self,
+        datetime: dt,
+        embedding_model: str,
+        labels: tuple[str, ...],
+        train_ratio: float,
+        rng: int | None,
+        max_train_examples_per_label: int,
+        learning_rate: float,
+        weak_neg_rate: float,
+        num_train_steps: float,
+        metrics: dict[str, Any],  # TODO: make this an object, not a dict
+        linear_classifier: classifier.LinearClassifier,
+    ) -> int:
         with Session(self.engine) as session:
             db_classifier = tables.Classifier(
-                datetime=classifier.datetime.isoformat(),
-                embedding_model=classifier.embedding_model,
+                datetime=datetime.isoformat(),
+                embedding_model=embedding_model,
+                labels=labels,
+                train_ratio=train_ratio,
+                rng=rng,
+                max_train_examples_per_label=max_train_examples_per_label,
+                learning_rate=learning_rate,
+                weak_neg_rate=weak_neg_rate,
+                num_train_steps=num_train_steps,
             )
 
             session.add(db_classifier)
@@ -76,12 +110,12 @@ class AnalyzerDB:
         classifier_id = db_classifier.id
 
         # Save the classifier and metrics files
-        classifier.linear_classifier.save(
+        linear_classifier.save(
             linear_classifier_path(self.config.classifiers_dir, classifier_id)
         )
         np.savez(
             metrics_path(self.config.classifiers_dir, classifier_id),
-            **classifier.metrics,
+            **metrics,
         )
 
         session.commit()
@@ -103,11 +137,9 @@ class AnalyzerDB:
                 ),
             )
 
-    def insert_classifier_output(self, classifier_output: ClassifierOutput) -> int:
+    def insert_classifier_output(self, classifier_id: int) -> int:
         with Session(self.engine) as session:
-            db_classifier_output = tables.ClassifierOutput(
-                classifier_id=classifier_output.classifier_id
-            )
+            db_classifier_output = tables.ClassifierOutput(classifier_id=classifier_id)
 
             session.add(db_classifier_output)
 

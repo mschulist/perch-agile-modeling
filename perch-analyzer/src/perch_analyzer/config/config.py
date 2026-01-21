@@ -11,6 +11,13 @@ class Config(BaseModel):
     precomputed_windows_dir: str
     ARU_data_glob: str
     db_path: str
+    throwaway_classes: list[str]
+    hoplite_db_path: str
+    train_ratio: float
+    max_train_examples_per_label: int
+    learning_rate: float
+    weak_neg_rate: float
+    num_train_steps: int
 
     def to_file(self):
         with open(self.config_path, "w") as f:
