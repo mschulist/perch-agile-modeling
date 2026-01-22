@@ -1,12 +1,17 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 import perch_analyzer.db.tables as tables
+from perch_hoplite import audio_io
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime as dt
 from typing import Any
 from perch_hoplite.agile import classifier
 from perch_analyzer.config import config
 import numpy as np
+from scipy.io import wavfile
+
+
+SAMPLE_RATE = 32000
 
 
 def linear_classifier_path(classifiers_dir: str, classifier_id: int):
@@ -19,6 +24,10 @@ def metrics_path(classifiers_dir: str, classifier_id: int):
 
 def classifier_output_path(classifier_outputs_dir: str, classifier_output_id: int):
     return f"{classifier_outputs_dir}/{classifier_output_id}.parquet"
+
+
+def get_target_recording_path(target_recordings_dir: str, target_recording_id: int):
+    return f"{target_recordings_dir}/{target_recording_id}"
 
 
 class Classifier(BaseModel):
@@ -49,6 +58,7 @@ class TargetRecording(BaseModel):
     xc_id: int | None
     filename: str | None
     label: str
+    audio: np.ndarray
 
 
 class AnalyzerDB:
@@ -164,15 +174,27 @@ class AnalyzerDB:
 
             db_target_recording = session.execute(stmt).scalar_one()
 
+            audio = audio_io.load_audio_file(
+                get_target_recording_path(
+                    self.config.target_recordings_dir, target_recording_id
+                ),
+                SAMPLE_RATE,
+            )
+
             return TargetRecording(
                 id=db_target_recording.id,
                 xc_id=db_target_recording.xc_id,
                 filename=db_target_recording.filename,
                 label=db_target_recording.label,
+                audio=audio,
             )
 
     def insert_target_recording(
-        self, xc_id: int | None, filename: str | None, label: str
+        self,
+        xc_id: int | None,
+        filename: str | None,
+        label: str,
+        audio: np.ndarray,
     ):
         with Session(self.engine) as session:
             db_target_recording = tables.TargetRecording(
@@ -184,5 +206,13 @@ class AnalyzerDB:
             session.add(db_target_recording)
 
         session.flush()
+
+        wavfile.write(
+            get_target_recording_path(
+                self.config.target_recordings_dir, db_target_recording.id
+            ),
+            SAMPLE_RATE,
+            audio,
+        )
 
         return db_target_recording.id

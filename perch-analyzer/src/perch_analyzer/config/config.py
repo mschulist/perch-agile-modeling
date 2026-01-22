@@ -19,6 +19,7 @@ class Config(BaseModel):
     weak_neg_rate: float
     num_train_steps: int
     embedding_model: str
+    xenocanto_api_key: str
 
     def to_file(self):
         with open(f"{self.data_path}/config.yaml", "w") as f:

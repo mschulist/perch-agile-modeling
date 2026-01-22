@@ -37,3 +37,4 @@ class TargetRecording(Base):
     xc_id: Mapped[int | None] = mapped_column(nullable=True, unique=False)
     filename: Mapped[str | None] = mapped_column(nullable=True, unique=False)
     label: Mapped[str] = mapped_column()
+    finished: Mapped[bool] = mapped_column(default=False)

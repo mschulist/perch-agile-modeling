@@ -82,4 +82,5 @@ def create_default_config(
         weak_neg_rate=0.05,
         num_train_steps=128,
         embedding_model=embedding_model,
+        xenocanto_api_key="test",
     )
