@@ -54,19 +54,24 @@ def main():
             share=args.share, server_name=args.server_name, server_port=args.server_port
         )
     elif args.module == "embed":
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
         # update the config with the ARU path
         conf = config.Config.load(args.data_dir)
-        conf.ARU_base_path = args.ARU_base_path
-        conf.ARU_file_glob = args.ARU_file_glob
-
-        conf.to_file()
 
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
             str(Path(conf.data_path) / conf.hoplite_db_path)
         )
 
         print("embedding audio...this may take a while")
-        embed.embed_audio(config=conf, hoplite_db=hoplite_db)
+        embed.embed_audio(
+            config=conf,
+            hoplite_db=hoplite_db,
+            ARU_base_path=args.ARU_base_path,
+            ARU_file_glob=args.ARU_file_glob,
+        )
         print("done embedding audio!")
 
     elif args.module == "init":

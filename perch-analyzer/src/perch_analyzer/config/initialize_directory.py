@@ -5,6 +5,10 @@ from perch_analyzer.config.config import Config
 from perch_hoplite.zoo import model_configs
 
 
+def check_initialized(data_path: Path):
+    return (data_path / "config.yaml").exists()
+
+
 def initialize_directory(
     data_path: Path,
     project_name: str,
@@ -68,8 +72,6 @@ def create_default_config(
         classifiers_dir="classifiers",
         classifier_outputs_dir="classifier_outputs",
         precomputed_windows_dir="precomputed_windows",
-        ARU_file_glob="",
-        ARU_base_path="",
         db_path="analyzer.db",
         throwaway_classes=[],
         hoplite_db_path="hoplite",

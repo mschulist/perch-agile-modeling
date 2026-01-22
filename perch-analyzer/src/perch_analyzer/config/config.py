@@ -9,8 +9,6 @@ class Config(BaseModel):
     classifiers_dir: str
     classifier_outputs_dir: str
     precomputed_windows_dir: str
-    ARU_file_glob: str
-    ARU_base_path: str
     db_path: str
     throwaway_classes: list[str]
     hoplite_db_path: str
