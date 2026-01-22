@@ -2797,6 +2797,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "gradio" },
+    { name = "httpx" },
     { name = "perch-hoplite" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -2811,6 +2812,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "gradio", specifier = ">=6.3.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "perch-hoplite", git = "https://github.com/google-research/perch-hoplite.git" },
     { name = "polars", specifier = ">=1.37.1" },
     { name = "pyarrow", specifier = ">=23.0.0" },

@@ -72,6 +72,7 @@ def create_default_config(
         classifiers_dir="classifiers",
         classifier_outputs_dir="classifier_outputs",
         precomputed_windows_dir="precomputed_windows",
+        target_recordings_dir="target_recordings",
         db_path="analyzer.db",
         throwaway_classes=[],
         hoplite_db_path="hoplite",

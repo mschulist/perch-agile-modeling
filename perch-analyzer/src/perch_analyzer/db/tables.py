@@ -28,3 +28,12 @@ class ClassifierOutput(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     classifier_id: Mapped[int] = mapped_column(ForeignKey("classifiers.id"))
+
+
+class TargetRecording(Base):
+    __tablename__ = "target_recordings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    xc_id: Mapped[int | None] = mapped_column(nullable=True, unique=False)
+    filename: Mapped[str | None] = mapped_column(nullable=True, unique=False)
+    label: Mapped[str] = mapped_column()

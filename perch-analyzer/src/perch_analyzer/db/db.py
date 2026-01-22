@@ -44,6 +44,13 @@ class ClassifierOutput(BaseModel):
     parquet_path: str
 
 
+class TargetRecording(BaseModel):
+    id: int
+    xc_id: int | None
+    filename: str | None
+    label: str
+
+
 class AnalyzerDB:
     def __init__(self, config: config.Config):
         self.config = config
@@ -148,3 +155,34 @@ class AnalyzerDB:
         session.flush()
 
         return db_classifier_output.id
+
+    def get_target_recording(self, target_recording_id: int) -> TargetRecording:
+        with Session(self.engine) as session:
+            stmt = select(tables.TargetRecording).where(
+                tables.TargetRecording.id == target_recording_id
+            )
+
+            db_target_recording = session.execute(stmt).scalar_one()
+
+            return TargetRecording(
+                id=db_target_recording.id,
+                xc_id=db_target_recording.xc_id,
+                filename=db_target_recording.filename,
+                label=db_target_recording.label,
+            )
+
+    def insert_target_recording(
+        self, xc_id: int | None, filename: str | None, label: str
+    ):
+        with Session(self.engine) as session:
+            db_target_recording = tables.TargetRecording(
+                xc_id=xc_id,
+                filename=filename,
+                label=label,
+            )
+
+            session.add(db_target_recording)
+
+        session.flush()
+
+        return db_target_recording.id

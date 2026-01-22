@@ -9,6 +9,7 @@ class Config(BaseModel):
     classifiers_dir: str
     classifier_outputs_dir: str
     precomputed_windows_dir: str
+    target_recordings_dir: str
     db_path: str
     throwaway_classes: list[str]
     hoplite_db_path: str
