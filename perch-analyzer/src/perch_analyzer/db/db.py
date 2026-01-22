@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 import perch_analyzer.db.tables as tables
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime as dt
 from typing import Any
 from perch_hoplite.agile import classifier
@@ -22,6 +22,8 @@ def classifier_output_path(classifier_outputs_dir: str, classifier_output_id: in
 
 
 class Classifier(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: int
     datetime: dt
     embedding_model: str
@@ -45,7 +47,7 @@ class ClassifierOutput(BaseModel):
 class AnalyzerDB:
     def __init__(self, config: config.Config):
         self.config = config
-        self.engine = create_engine(config.db_path)
+        self.engine = create_engine(f"sqlite:///{config.data_path}/{config.db_path}")
         tables.Base.metadata.create_all(self.engine)
 
     def get_classifier(self, classifier_id: int) -> Classifier:
@@ -68,7 +70,7 @@ class AnalyzerDB:
                 embedding_model=db_classifier.embedding_model,
                 linear_classifier=linear_classifier,
                 metrics=metrics,
-                labels=db_classifier.labels,
+                labels=tuple(db_classifier.labels),
                 num_train_steps=db_classifier.num_train_steps,
                 learning_rate=db_classifier.learning_rate,
                 rng=db_classifier.rng,

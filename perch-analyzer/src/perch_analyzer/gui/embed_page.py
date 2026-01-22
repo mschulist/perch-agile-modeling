@@ -1,5 +1,5 @@
 import gradio as gr
 
 
-with gr.Blocks() as demo:
+with gr.Blocks() as embed:
     gr.Markdown("# Embed")

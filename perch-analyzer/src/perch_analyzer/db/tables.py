@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, JSON
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -14,7 +14,7 @@ class Classifier(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     datetime: Mapped[str] = mapped_column()
     embedding_model: Mapped[str] = mapped_column()
-    labels: Mapped[tuple[str, ...]] = mapped_column()
+    labels: Mapped[list[str]] = mapped_column(JSON)
     train_ratio: Mapped[float] = mapped_column()
     rng: Mapped[int | None] = mapped_column(nullable=True)
     max_train_examples_per_label: Mapped[int] = mapped_column()

@@ -3,7 +3,7 @@ import yaml
 
 
 class Config(BaseModel):
-    config_path: str
+    data_path: str
     project_name: str
     user_name: str
     classifiers_dir: str
@@ -22,12 +22,12 @@ class Config(BaseModel):
     embedding_model: str
 
     def to_file(self):
-        with open(self.config_path, "w") as f:
+        with open(f"{self.data_path}/config.yaml", "w") as f:
             yaml.dump(self.model_dump(), f, sort_keys=True, indent=4)
 
     @classmethod
-    def load(cls, config_path: str):
-        with open(config_path, "r") as f:
+    def load(cls, data_path: str):
+        with open(f"{data_path}/config.yaml", "r") as f:
             data = yaml.safe_load(f)
 
         return cls(**data)
