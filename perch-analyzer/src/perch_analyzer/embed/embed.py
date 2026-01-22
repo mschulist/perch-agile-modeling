@@ -1,6 +1,6 @@
 from perch_analyzer.config import config
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
-from perch_hoplite.agile import embed, source_info, colab_utils
+from perch_hoplite.agile import embed, source_info
 from perch_hoplite.zoo import model_configs
 
 

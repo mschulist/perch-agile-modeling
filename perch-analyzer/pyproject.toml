@@ -5,6 +5,7 @@ description = "Program to build bioacoustics classifiers"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "gradio>=6.3.0",
     "perch-hoplite",
     "polars>=1.37.1",
     "pyarrow>=23.0.0",
@@ -17,3 +18,6 @@ dependencies = [
 
 [tool.uv.sources]
 perch-hoplite = { git = "https://github.com/google-research/perch-hoplite.git" }
+
+[project.scripts]
+perch-analyzer = "perch_analyzer.cli:main"
