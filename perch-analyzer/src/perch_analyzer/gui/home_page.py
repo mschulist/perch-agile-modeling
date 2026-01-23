@@ -1,5 +1,5 @@
 import gradio as gr
-from perch_analyzer.gui import annotate_page
+from perch_analyzer.gui import annotate_page, examine_page
 from pathlib import Path
 from perch_analyzer.config import config
 from perch_analyzer.db import db
@@ -18,6 +18,10 @@ def home(data_dir: Path):
         gr.Markdown("Welcome to Perch Analyzer!")
     with homepage.route("Annotate"):
         annotate_page.annotate(
+            config=conf, analyzer_db=analyzer_db, hoplite_db=hoplite_db
+        )
+    with homepage.route("Examine"):
+        examine_page.examine(
             config=conf, analyzer_db=analyzer_db, hoplite_db=hoplite_db
         )
     return homepage
