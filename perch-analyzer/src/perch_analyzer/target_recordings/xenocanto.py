@@ -1,5 +1,4 @@
 import time
-from perch_hoplite import audio_io
 from perch_hoplite.taxonomy import namespace_db
 import httpx
 
@@ -24,6 +23,10 @@ def get_xc_ids(config: config.Config, ebird_6_code: str, call_type: str) -> list
         status_code = response.status_code
         if status_code == 200:
             break
+        if status_code == 401:
+            raise ValueError(
+                "unauthorized xenocanto request, make sure to set your xenocanto API key"
+            )
         time.sleep(0.25)
 
     if not response:

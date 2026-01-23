@@ -3,6 +3,8 @@ from perch_analyzer.gui.home_page import homepage
 from perch_analyzer.config import initialize_directory, config
 from pathlib import Path
 from perch_analyzer.embed import embed
+from perch_analyzer.target_recordings import target_recordings
+from perch_analyzer.db import db
 from perch_hoplite.db import sqlite_usearch_impl
 
 
@@ -45,6 +47,20 @@ def main():
     embed_parser.add_argument("--ARU_base_path", type=str, required=True)
     embed_parser.add_argument("--ARU_file_glob", type=str, required=True)
 
+    # Target recordings subcommand
+    target_recordings_parser = subparsers.add_parser(
+        "target_recordings", help="Gather target recordings"
+    )
+    target_recordings_parser.add_argument("--data_dir", type=Path, required=True)
+    target_recordings_parser.add_argument("--ebird_code", type=str, required=True)
+    target_recordings_parser.add_argument(
+        "--call_type",
+        type=str,
+        required=True,
+        help="call type to search for, one of (song, call)",
+    )
+    target_recordings_parser.add_argument("--num_recordings", type=int, default=1)
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -73,7 +89,6 @@ def main():
             ARU_file_glob=args.ARU_file_glob,
         )
         print("done embedding audio!")
-
     elif args.module == "init":
         initialize_directory.initialize_directory(
             data_path=args.data_dir,
@@ -82,6 +97,25 @@ def main():
             embedding_model=args.embedding_model,
         )
         print(f"Successfully initialized directory {args.data_dir}!")
+    elif args.module == "target_recordings":
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
+        conf = config.Config.load(args.data_dir)
+        analyzer_db = db.AnalyzerDB(conf)
+
+        print("adding recordings from xenocanto")
+
+        target_recordings.add_target_recording_from_xc(
+            config=conf,
+            db=analyzer_db,
+            ebird_6_code=args.ebird_code,
+            call_type=args.call_type,
+            num_recordings=args.num_recordings,
+        )
+
+        print("finished adding recordings!")
 
 
 if __name__ == "__main__":

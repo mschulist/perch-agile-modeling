@@ -27,7 +27,7 @@ def classifier_output_path(classifier_outputs_dir: str, classifier_output_id: in
 
 
 def get_target_recording_path(target_recordings_dir: str, target_recording_id: int):
-    return f"{target_recordings_dir}/{target_recording_id}"
+    return f"{target_recordings_dir}/{target_recording_id}.wav"
 
 
 class Classifier(BaseModel):
@@ -54,6 +54,8 @@ class ClassifierOutput(BaseModel):
 
 
 class TargetRecording(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: int
     xc_id: int | None
     filename: str | None
@@ -76,10 +78,18 @@ class AnalyzerDB:
 
             # now we load the metrics and linear_classifier based on the id
             linear_classifier = classifier.LinearClassifier.load(
-                linear_classifier_path(self.config.classifiers_dir, classifier_id)
+                linear_classifier_path(
+                    f"{self.config.data_path}/{self.config.classifiers_dir}",
+                    classifier_id,
+                )
             )
 
-            metrics = np.load(metrics_path(self.config.classifiers_dir, classifier_id))
+            metrics = np.load(
+                metrics_path(
+                    f"{self.config.data_path}/{self.config.classifiers_dir}",
+                    classifier_id,
+                )
+            )
 
             return Classifier(
                 id=classifier_id,
@@ -125,20 +135,26 @@ class AnalyzerDB:
 
             session.add(db_classifier)
 
-        session.flush()
-        classifier_id = db_classifier.id
+            session.flush()
+            classifier_id = db_classifier.id
 
-        # Save the classifier and metrics files
-        linear_classifier.save(
-            linear_classifier_path(self.config.classifiers_dir, classifier_id)
-        )
-        np.savez(
-            metrics_path(self.config.classifiers_dir, classifier_id),
-            **metrics,
-        )
+            # Save the classifier and metrics files
+            linear_classifier.save(
+                linear_classifier_path(
+                    f"{self.config.data_path}/{self.config.classifiers_dir}",
+                    classifier_id,
+                )
+            )
+            np.savez(
+                metrics_path(
+                    f"{self.config.data_path}/{self.config.classifiers_dir}",
+                    classifier_id,
+                ),
+                **metrics,
+            )
 
-        session.commit()
-        return classifier_id
+            session.commit()
+            return classifier_id
 
     def get_classifier_output(self, classifier_output_id: int) -> ClassifierOutput:
         with Session(self.engine) as session:
@@ -152,7 +168,8 @@ class AnalyzerDB:
                 id=classifier_output_id,
                 classifier_id=db_classifier_output.classifier_id,
                 parquet_path=classifier_output_path(
-                    self.config.classifier_outputs_dir, classifier_output_id
+                    f"{self.config.data_path}/{self.config.classifier_outputs_dir}",
+                    classifier_output_id,
                 ),
             )
 
@@ -162,9 +179,9 @@ class AnalyzerDB:
 
             session.add(db_classifier_output)
 
-        session.flush()
+            session.flush()
 
-        return db_classifier_output.id
+            return db_classifier_output.id
 
     def get_target_recording(self, target_recording_id: int) -> TargetRecording:
         with Session(self.engine) as session:
@@ -176,7 +193,8 @@ class AnalyzerDB:
 
             audio = audio_io.load_audio_file(
                 get_target_recording_path(
-                    self.config.target_recordings_dir, target_recording_id
+                    f"{self.config.data_path}/{self.config.target_recordings_dir}",
+                    target_recording_id,
                 ),
                 SAMPLE_RATE,
             )
@@ -204,15 +222,17 @@ class AnalyzerDB:
             )
 
             session.add(db_target_recording)
+            session.flush()
 
-        session.flush()
+            wavfile.write(
+                get_target_recording_path(
+                    f"{self.config.data_path}/{self.config.target_recordings_dir}",
+                    db_target_recording.id,
+                ),
+                SAMPLE_RATE,
+                audio,
+            )
 
-        wavfile.write(
-            get_target_recording_path(
-                self.config.target_recordings_dir, db_target_recording.id
-            ),
-            SAMPLE_RATE,
-            audio,
-        )
+            session.commit()
 
-        return db_target_recording.id
+            return db_target_recording.id

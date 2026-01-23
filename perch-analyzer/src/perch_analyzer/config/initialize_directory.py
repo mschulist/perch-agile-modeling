@@ -55,6 +55,7 @@ def initialize_directory(
     (data_path / config.classifier_outputs_dir).mkdir(exist_ok=True, parents=True)
     (data_path / config.classifiers_dir).mkdir(exist_ok=True, parents=True)
     (data_path / config.precomputed_windows_dir).mkdir(exist_ok=True, parents=True)
+    (data_path / config.target_recordings_dir).mkdir(exist_ok=True, parents=True)
 
     return analyzer_db, hoplite_db
 
