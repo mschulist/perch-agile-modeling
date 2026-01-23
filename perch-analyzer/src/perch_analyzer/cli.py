@@ -1,5 +1,5 @@
 import argparse
-from perch_analyzer.gui.home_page import homepage
+from perch_analyzer.gui import home_page
 from perch_analyzer.config import initialize_directory, config
 from pathlib import Path
 from perch_analyzer.embed import embed
@@ -64,14 +64,16 @@ def main():
 
     # Search subcommand
     search_parser = subparsers.add_parser("search", help="Search recordings")
-    search_parser.add_argument("--num_per_target_recording", default=5)
+    search_parser.add_argument("--data_dir", type=Path, required=True)
+    search_parser.add_argument("--num_per_target_recording", type=int, default=5)
 
     # Parse arguments
     args = parser.parse_args()
 
     # Route to appropriate section
     if args.module == "gui":
-        homepage.launch(
+        demo = home_page.home(args.data_dir)
+        demo.launch(
             share=args.share, server_name=args.server_name, server_port=args.server_port
         )
     elif args.module == "embed":
@@ -135,6 +137,7 @@ def main():
         print("searching recordings")
 
         search.search_using_target_recordings(
+            config=conf,
             db=analyzer_db,
             hoplite_db=hoplite_db,
             num_per_target_recording=args.num_per_target_recording,

@@ -74,3 +74,5 @@ def update_labels(
             label_type=interface.LabelType.POSITIVE,
             provenance=config.user_name,
         )
+
+    hoplite_db.commit()
