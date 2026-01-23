@@ -236,3 +236,37 @@ class AnalyzerDB:
             session.commit()
 
             return db_target_recording.id
+
+    def get_all_target_recordings(
+        self, include_finished: bool
+    ) -> list[TargetRecording]:
+        with Session(self.engine) as session:
+            stmt = select(tables.TargetRecording)
+
+            if not include_finished:
+                stmt = stmt.where(tables.TargetRecording.finished.is_(False))
+
+            db_target_recordings = session.execute(stmt).scalars().all()
+
+            target_recordings: list[TargetRecording] = []
+
+            for db_target_recording in db_target_recordings:
+                audio = audio_io.load_audio_file(
+                    get_target_recording_path(
+                        f"{self.config.data_path}/{self.config.target_recordings_dir}",
+                        db_target_recording.id,
+                    ),
+                    SAMPLE_RATE,
+                )
+
+                target_recordings.append(
+                    TargetRecording(
+                        id=db_target_recording.id,
+                        xc_id=db_target_recording.xc_id,
+                        filename=db_target_recording.filename,
+                        label=db_target_recording.label,
+                        audio=audio,
+                    )
+                )
+
+            return target_recordings
