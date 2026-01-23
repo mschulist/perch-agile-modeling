@@ -113,9 +113,10 @@ def annotate(
             f"{config.data_path}/{config.hoplite_db_path}"
         )
 
-        make_annotation(
-            config, thread_hoplite_db, labels if labels else [], current_window
-        )
+        # Filter out empty labels
+        filtered_labels = [label.strip() for label in (labels or []) if label.strip()]
+
+        make_annotation(config, thread_hoplite_db, filtered_labels, current_window)
 
         # Get updated label list after annotation
         updated_labels = thread_hoplite_db.get_all_labels()
