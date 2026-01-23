@@ -29,7 +29,8 @@ def get_windows_by_label(
         window = hoplite_db.get_window(window_id)
         annotations = hoplite_db.get_all_annotations(
             config_dict.create(
-                eq=dict(recording_id=window.recording_id, offsets=window.offsets)
+                eq=dict(recording_id=window.recording_id),
+                approx=dict(offsets=window.offsets),
             )
         )
         recording = hoplite_db.get_recording(window.recording_id)
@@ -53,7 +54,8 @@ def update_labels(
 
     existing_annotations = hoplite_db.get_all_annotations(
         config_dict.create(
-            eq=dict(offsets=window.offsets, recording_id=window.recording_id)
+            eq=dict(recording_id=window.recording_id),
+            approx=dict(offsets=window.offsets),
         )
     )
 
