@@ -13,13 +13,19 @@ import numpy as np
 def get_audio_window_path(
     config: config.Config, hoplite_db: SQLiteUSearchDB, window_id: int
 ) -> tuple[Path, Path]:
-    recording_file = Path(config.precomputed_windows_dir) / f"{window_id}.wav"
-    spec_file = Path(config.precomputed_windows_dir) / f"{window_id}.png"
+    recording_file = (
+        Path(config.data_path) / config.precomputed_windows_dir / f"{window_id}.wav"
+    )
+    spec_file = (
+        Path(config.data_path) / config.precomputed_windows_dir / f"{window_id}.png"
+    )
 
-    # TODO: get the sample rate from this
-    sample_rate = str(hoplite_db.get_metadata("sample_rate"))
-    base_path = str(hoplite_db.get_metadata("base_path"))
-    window_size_s = str(hoplite_db.get_metadata("window_size_s"))
+    # TODO: make this less cursed/more robust
+    model_config = hoplite_db.get_metadata("model_config").model_config
+    sample_rate = model_config.sample_rate  # type: ignore
+    window_size_s = model_config.window_size_s  # type: ignore
+    audio_globs = hoplite_db.get_metadata("audio_sources").audio_globs
+    base_path = audio_globs[0]["base_path"]  # type: ignore
 
     if not recording_file.exists() or not spec_file.exists():
         window = hoplite_db.get_window(window_id)

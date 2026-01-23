@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from perch_hoplite.db import interface
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 from perch_analyzer.config import config
@@ -7,6 +7,8 @@ from ml_collections import config_dict
 
 
 class WindowWithAnnotations(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     recording: interface.Recording
     window: interface.Window
     annotations: list[interface.Annotation]
