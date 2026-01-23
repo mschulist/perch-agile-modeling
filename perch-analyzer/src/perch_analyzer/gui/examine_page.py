@@ -16,6 +16,8 @@ class RecordingDisplay:
     labels: str
     spec_file: str | None
     recording_file: str | None
+    window_id: int
+    labels_list: list[str]
 
 
 def examine(
@@ -61,33 +63,12 @@ def examine(
                     labels=", ".join(labels_list),
                     spec_file=str(spec_file),
                     recording_file=str(recording_file),
+                    window_id=window_with_annotations.window.id,
+                    labels_list=labels_list,
                 )
             )
 
         return recordings
-
-    def show_label_recordings(evt: gr.SelectData) -> list:
-        """Show all recordings for the selected label."""
-        selected_label: str = evt.value
-        recordings = get_recordings_for_label(selected_label)
-
-        if not recordings:
-            return [gr.Column(visible=True)]
-
-        # Build list of components to render
-        components = []
-
-        for rec in recordings:
-            # Create a group for each recording
-            with gr.Group(visible=True):
-                gr.Markdown(f"### {rec.filename}")
-                gr.Markdown(f"**Offsets:** {rec.offsets}  \n**Labels:** {rec.labels}")
-                gr.Image(
-                    value=rec.spec_file, height=300, show_label=False, container=False
-                )
-                gr.Audio(value=rec.recording_file, show_label=False, container=False)
-
-        return [gr.Column(visible=True)]
 
     with gr.Blocks() as examine_blocks:
         with gr.Row():
@@ -124,14 +105,45 @@ def examine(
                         return
 
                     for rec in recordings:
-                        with gr.Group():
+                        with gr.Group() as recording_group:
                             gr.Markdown(f"### {rec.filename}")
-                            gr.Markdown(
-                                f"**Offsets:** {rec.offsets}  \n**Labels:** {rec.labels}"
+
+                            labels_display = gr.Markdown(
+                                f"**Offsets:** {rec.offsets}  \n**Labels:** {rec.labels}",
+                                elem_id=f"labels_{rec.window_id}",
                             )
+
+                            # Hidden state to store window info
+                            window_id_state = gr.State(value=rec.window_id)
+                            offsets_state = gr.State(value=rec.offsets)
+                            selected_label_filter = gr.State(value=selected_label)
+
+                            # Edit button and controls in a clean layout
+                            edit_btn = gr.Button(
+                                "Edit Labels", size="sm", variant="secondary"
+                            )
+
+                            with gr.Column(visible=False) as edit_section:
+                                edit_dropdown = gr.Dropdown(
+                                    choices=all_labels,
+                                    value=rec.labels_list,
+                                    multiselect=True,
+                                    allow_custom_value=True,
+                                    label="Labels",
+                                    interactive=True,
+                                )
+                                with gr.Row():
+                                    save_btn = gr.Button(
+                                        "Save",
+                                        variant="primary",
+                                        size="sm",
+                                        interactive=len(rec.labels_list) > 0,
+                                    )
+                                    cancel_btn = gr.Button("Cancel", size="sm")
+
                             gr.Image(
                                 value=rec.spec_file,
-                                height=300,
+                                height=350,
                                 show_label=False,
                                 container=False,
                             )
@@ -139,6 +151,74 @@ def examine(
                                 value=rec.recording_file,
                                 show_label=False,
                                 container=False,
+                            )
+
+                            # Event handlers for this recording
+                            def show_edit():
+                                return gr.Column(visible=True)
+
+                            def hide_edit():
+                                return gr.Column(visible=False)
+
+                            def update_save_button(labels: list[str]) -> gr.Button:
+                                """Enable save button only when at least one label is selected."""
+                                return gr.Button(
+                                    interactive=len(labels) > 0 if labels else False
+                                )
+
+                            def save_labels_handler(
+                                new_labels: list[str],
+                                window_id: int,
+                                offsets: str,
+                                current_label: str,
+                            ) -> tuple:
+                                # Create new DB connection for this thread
+                                thread_hoplite_db = hoplite_db.thread_split()
+
+                                # Update labels in database
+                                examine_annotations.update_labels(
+                                    config=config,
+                                    hoplite_db=thread_hoplite_db,
+                                    window_id=window_id,
+                                    new_labels=new_labels,
+                                )
+                                thread_hoplite_db.commit()
+
+                                # Check if the current label was removed
+                                if current_label not in new_labels:
+                                    # Hide the entire recording group
+                                    return (
+                                        "",
+                                        gr.Column(visible=False),
+                                        gr.Group(visible=False),
+                                    )
+
+                                # Return updated markdown string and hide modal
+                                labels_str = (
+                                    ", ".join(new_labels) if new_labels else "None"
+                                )
+                                return (
+                                    f"**Offsets:** {offsets}  \n**Labels:** {labels_str}",
+                                    gr.Column(visible=False),
+                                    gr.Group(visible=True),
+                                )
+
+                            edit_btn.click(fn=show_edit, outputs=[edit_section])
+                            cancel_btn.click(fn=hide_edit, outputs=[edit_section])
+                            edit_dropdown.change(
+                                fn=update_save_button,
+                                inputs=[edit_dropdown],
+                                outputs=[save_btn],
+                            )
+                            save_btn.click(
+                                fn=save_labels_handler,
+                                inputs=[
+                                    edit_dropdown,
+                                    window_id_state,
+                                    offsets_state,
+                                    selected_label_filter,
+                                ],
+                                outputs=[labels_display, edit_section, recording_group],
                             )
 
         # Wire up the search functionality
