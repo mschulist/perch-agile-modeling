@@ -5,6 +5,7 @@ from pathlib import Path
 from perch_analyzer.embed import embed
 from perch_analyzer.target_recordings import target_recordings
 from perch_analyzer.db import db
+from perch_analyzer.search import search
 from perch_hoplite.db import sqlite_usearch_impl
 
 
@@ -61,6 +62,10 @@ def main():
     )
     target_recordings_parser.add_argument("--num_recordings", type=int, default=1)
 
+    # Search subcommand
+    search_parser = subparsers.add_parser("search", help="Search recordings")
+    search_parser.add_argument("--num_per_target_recording", default=5)
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -116,6 +121,26 @@ def main():
         )
 
         print("finished adding recordings!")
+    if args.module == "search":
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
+        conf = config.Config.load(args.data_dir)
+        analyzer_db = db.AnalyzerDB(conf)
+        hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
+            str(Path(conf.data_path) / conf.hoplite_db_path)
+        )
+
+        print("searching recordings")
+
+        search.search_using_target_recordings(
+            db=analyzer_db,
+            hoplite_db=hoplite_db,
+            num_per_target_recording=args.num_per_target_recording,
+        )
+
+        print("finished searching recordings!")
 
 
 if __name__ == "__main__":
