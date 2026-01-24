@@ -6,6 +6,7 @@ from perch_analyzer.embed import embed
 from perch_analyzer.target_recordings import target_recordings
 from perch_analyzer.db import db
 from perch_analyzer.search import search
+from perch_analyzer.classify import classifier, classify
 from perch_hoplite.db import sqlite_usearch_impl
 
 
@@ -66,6 +67,29 @@ def main():
     search_parser = subparsers.add_parser("search", help="Search recordings")
     search_parser.add_argument("--data_dir", type=Path, required=True)
     search_parser.add_argument("--num_per_target_recording", type=int, default=5)
+
+    # Create classifier subcommand
+    create_classifier_parser = subparsers.add_parser(
+        "create_classifier", help="Create a custom classifier"
+    )
+    create_classifier_parser.add_argument("--data_dir", type=Path, required=True)
+    create_classifier_parser.add_argument(
+        "--throwaway_classes", type=list[str], default=[]
+    )
+    create_classifier_parser.add_argument("--train_ratio", type=float, default=0.8)
+    create_classifier_parser.add_argument(
+        "--max_train_examples_per_label", type=int, default=100
+    )
+    create_classifier_parser.add_argument("--learning_rate", type=float, default=1e-3)
+    create_classifier_parser.add_argument("--weak_neg_rate", type=float, default=0.05)
+    create_classifier_parser.add_argument("--num_train_steps", type=int, default=128)
+
+    # Run classifier subcommand
+    run_classifier_parser = subparsers.add_parser(
+        "run_classifier", help="Run a custom classifier on the data"
+    )
+    run_classifier_parser.add_argument("--data_dir", type=Path, required=True)
+    run_classifier_parser.add_argument("--classifier_id", type=int, required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -144,6 +168,50 @@ def main():
         )
 
         print("finished searching recordings!")
+
+    if args.module == "create_classifier":
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
+        conf = config.Config.load(args.data_dir)
+        analyzer_db = db.AnalyzerDB(conf)
+        hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
+            str(Path(conf.data_path) / conf.hoplite_db_path)
+        )
+
+        print("making custom classifier")
+        classifier.train_classifier(
+            config=conf,
+            hoplite_db=hoplite_db,
+            analyzer_db=analyzer_db,
+            throwaway_classes=args.throwaway_classes,
+            train_ratio=args.train_ratio,
+            max_train_examples_per_label=args.max_train_examples_per_label,
+            learning_rate=args.learning_rate,
+            weak_neg_rate=args.weak_neg_rate,
+            num_train_steps=args.num_train_steps,
+        )
+
+        print("done making classifier!")
+    if args.module == "run_classifier":
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
+        conf = config.Config.load(args.data_dir)
+        analyzer_db = db.AnalyzerDB(conf)
+        hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
+            str(Path(conf.data_path) / conf.hoplite_db_path)
+        )
+
+        print("running classifier!")
+        classify.classify(
+            classifier_id=args.classifier_id,
+            hoplite_db=hoplite_db,
+            analyzer_db=analyzer_db,
+        )
+        print("done running classifier")
 
 
 if __name__ == "__main__":

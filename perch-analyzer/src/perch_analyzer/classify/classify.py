@@ -85,3 +85,5 @@ def classify(
             schema=arrow_schema,
         )
         writer.write_table(arrow_table)
+
+    writer.close()

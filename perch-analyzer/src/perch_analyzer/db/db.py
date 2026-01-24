@@ -181,6 +181,8 @@ class AnalyzerDB:
 
             session.flush()
 
+            session.commit()
+
             return db_classifier_output.id
 
     def get_target_recording(self, target_recording_id: int) -> TargetRecording:

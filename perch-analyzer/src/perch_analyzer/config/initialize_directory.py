@@ -75,13 +75,7 @@ def create_default_config(
         precomputed_windows_dir="precomputed_windows",
         target_recordings_dir="target_recordings",
         db_path="analyzer.db",
-        throwaway_classes=[],
         hoplite_db_path="hoplite",
-        train_ratio=0.8,
-        max_train_examples_per_label=100,
-        learning_rate=1e-3,
-        weak_neg_rate=0.05,
-        num_train_steps=128,
         embedding_model=embedding_model,
         xenocanto_api_key="test",
     )
