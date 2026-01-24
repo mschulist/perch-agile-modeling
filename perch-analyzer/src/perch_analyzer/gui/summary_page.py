@@ -1,8 +1,6 @@
 import gradio as gr
-from dataclasses import dataclass
 from perch_analyzer.config import config
 from perch_analyzer.db import db
-from perch_analyzer.examine import examine_annotations, audio_windows
 from perch_hoplite.db import sqlite_usearch_impl, interface
 from ml_collections import config_dict
 

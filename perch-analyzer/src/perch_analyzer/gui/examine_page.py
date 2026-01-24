@@ -106,6 +106,7 @@ def examine(
                         return
 
                     for rec in recordings:
+                        rec
                         with gr.Group() as recording_group:
                             gr.Markdown(f"### {rec.filename}")
 
