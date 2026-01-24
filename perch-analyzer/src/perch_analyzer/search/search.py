@@ -35,5 +35,6 @@ def search_using_target_recordings(
                 provenance=SEARCH_PROVENANCE,
                 label_type=interface.LabelType.POSSIBLE,
             )
+        db.set_finish_target_recording(target_recording.id, True)
 
     hoplite_db.commit()

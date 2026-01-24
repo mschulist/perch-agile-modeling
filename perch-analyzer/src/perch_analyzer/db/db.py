@@ -270,3 +270,24 @@ class AnalyzerDB:
                 )
 
             return target_recordings
+
+    def count_target_recordings(self, include_finished: bool):
+        with Session(self.engine) as session:
+            stmt = select(tables.TargetRecording)
+
+            if not include_finished:
+                stmt = stmt.where(tables.TargetRecording.finished.is_(False))
+
+            count = session.execute(stmt).scalars().all()
+            return len(count)
+
+    def set_finish_target_recording(self, target_recording_id: int, finished: bool):
+        with Session(self.engine) as session:
+            stmt = select(tables.TargetRecording).where(
+                tables.TargetRecording.id == target_recording_id
+            )
+            db_target_recording = session.execute(stmt).scalar_one()
+            db_target_recording.finished = finished
+            session.commit()
+
+            return db_target_recording.id
