@@ -26,7 +26,9 @@ def examine(
     hoplite_db: sqlite_usearch_impl.SQLiteUSearchDB,
 ) -> gr.Blocks:
     hoplite_db = hoplite_db.thread_split()
-    all_labels: list[str] = list(hoplite_db.get_all_labels())
+    all_labels: list[str] = list(
+        hoplite_db.get_all_labels(label_type=interface.LabelType.POSITIVE)
+    )
 
     def filter_labels(search_query: str) -> list[list[str]]:
         """Filter labels based on search query"""
