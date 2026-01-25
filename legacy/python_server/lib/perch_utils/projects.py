@@ -1,5 +1,5 @@
 from perch_hoplite.agile import colab_utils, source_info
-from lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
+from python_server.lib.perch_utils.usearch_hoplite import SQLiteUsearchDBExt
 import os
 
 

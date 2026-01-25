@@ -11,7 +11,7 @@ def make_classifier():
     accounts_db = AccountsDB()
     classifier = ClassifyFromLabels(
         db=accounts_db,
-        hoplite_db=load_hoplite_db(2),
+        hoplite_db=load_hoplite_db(3),
         project_id=1,
         classify_path="data/classify",
     )

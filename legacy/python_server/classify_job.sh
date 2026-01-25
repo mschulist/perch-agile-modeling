@@ -6,7 +6,6 @@
 #SBATCH --mem=48G
 #SBATCH --nodelist=flor
 #SBATCH --output=logs/%x-%j.out
-#SBATCH --error=logs/%x-%j.err
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK

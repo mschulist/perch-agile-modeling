@@ -4,9 +4,13 @@ from tqdm import tqdm
 
 
 old_db = load_hoplite_db(1)
-new_db = load_hoplite_db(2)
+new_db = load_hoplite_db(3)
 
 annotations = old_db.get_all_annotations()
+
+print(old_db.count_embeddings())
+print(new_db.count_embeddings())
+
 
 for ann in tqdm(annotations):
     window = old_db.get_window(ann.window_id)

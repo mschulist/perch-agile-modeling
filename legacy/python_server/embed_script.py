@@ -20,7 +20,7 @@ def embed_audio(dry_run=True):
         min_audio_len_s=3,
     )
 
-    db_path = "/home/mschulist/perch-agile-modeling/python_server/data/hoplite_db/hoplite_2.db"
+    db_path = "/home/mschulist/perch-agile-modeling/python_server/data/hoplite_db/hoplite_3.db"
     configs = colab_utils.load_configs(
         audio_sources=source_info.AudioSources((audio_glob,)),
         db_path=db_path,
