@@ -1,6 +1,7 @@
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 from perch_hoplite.agile.classifier import batched_embedding_iterator
 from perch_analyzer.db.db import AnalyzerDB
+from ml_collections import config_dict
 
 from tqdm import tqdm
 import numpy as np
@@ -45,7 +46,7 @@ def classify(
 
     emb_iter = batched_embedding_iterator(hoplite_db, window_ids, batch_size=BATCH_SIZE)
 
-    for batch_idxes, batch_embs in tqdm(
+    for batch_window_ids, batch_embs in tqdm(
         emb_iter,
         total=len(window_ids) // BATCH_SIZE,
         desc="Classifying and writing",
@@ -55,9 +56,21 @@ def classify(
         filenames: list[str] = []
         offsets: list[float] = []
 
-        for window_id in batch_idxes:
-            window = hoplite_db.get_window(int(window_id))
-            filenames.append(hoplite_db.get_recording(window.recording_id).filename)
+        windows = hoplite_db.get_all_windows(
+            filter=config_dict.create(isin=dict(id=list(batch_window_ids)))
+        )
+
+        recording_id_to_filename: dict[int, str] = {}
+
+        recording_ids: set[int] = set([window.recording_id for window in windows])
+
+        for recording_id in recording_ids:
+            if recording_id not in recording_id_to_filename:
+                recording = hoplite_db.get_recording(recording_id)
+                recording_id_to_filename[recording_id] = recording.filename
+
+        for window in windows:
+            filenames.append(recording_id_to_filename[window.recording_id])
             offsets.append(float(window.offsets[0]))
 
         num_embeddings = logits.shape[0]
@@ -69,7 +82,7 @@ def classify(
             )
 
         filenames_repeated = np.repeat(filenames, num_classes)
-        window_ids_repeated = np.repeat(batch_idxes, num_classes)
+        window_ids_repeated = np.repeat(batch_window_ids, num_classes)
         offsets_repeated = np.repeat(offsets, num_classes).astype(np.float32)
         logits_flat = logits.flatten().astype(np.float32)
         labels_repeated = np.tile(labels, num_embeddings)
