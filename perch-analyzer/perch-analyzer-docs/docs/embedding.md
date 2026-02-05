@@ -14,9 +14,10 @@ Let $e_1$ and $e_2$ be two embeddings for a given species (say Blue Jay). Then, 
 
 Given that $e_1$ and $e_2$ both contain the same focal species, we expect their inner product $\langle e_1, e_2 \rangle$ to be high. Say that $e_3$ is an embedding for another species, such as Great-horned Owl. Then we expect $\langle e_1, e_3 \rangle$ and $\langle e_2, e_3 \rangle$ to be small, because these embeddings come from different focal species. 
 
-Thankfully for us, the hard work of creating these embedding models has already been done for us! So all we need to do is run these embedding models on our data, making our task of creating a classifier far easier (and computationally cheap). 
+Thankfully for us, the hard work of creating these embedding models has already been done for us! So all we need to do is run these embedding models on our data, making our task of creating a classifier far easier (and computationally cheap).
 
-## Example
+
+## Usage
 
 To embed your data, we use the following command:
 
