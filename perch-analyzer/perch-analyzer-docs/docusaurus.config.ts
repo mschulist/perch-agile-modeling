@@ -9,7 +9,7 @@ const config: Config = {
   url: "https://your-docusaurus-site.example.com",
   baseUrl: "/",
   onBrokenLinks: "warn",
-  favicon: "static/logo.png",
+  favicon: "/static/logo.png",
 
   future: {
     v4: true,
@@ -63,7 +63,7 @@ const config: Config = {
     },
     footer: {
       style: "dark",
-      copyright: `Copyright © ${new Date().getFullYear()} Perch Analyzer`,
+      copyright: `Copyright © ${new Date().getFullYear()} Mark Schulist`,
     },
     prism: {
       theme: prismThemes.github,

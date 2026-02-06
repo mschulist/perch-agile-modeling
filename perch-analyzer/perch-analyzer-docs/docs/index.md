@@ -2,7 +2,7 @@
 sidebar_position: 1
 ---
 
-# Get Started!
+# Welcome!
 
 Welcome to the Perch Analyzer documentation.
 
