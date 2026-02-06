@@ -1,235 +1,371 @@
-import gradio as gr
-from dataclasses import dataclass
-from perch_analyzer.config import config
-from perch_analyzer.db import db
+import reflex as rx
+from typing import Optional
+from pathlib import Path
+import os
+from perch_analyzer.gui.state import ConfigState
 from perch_analyzer.examine import examine_annotations, audio_windows
-from perch_hoplite.db import sqlite_usearch_impl, interface
+from perch_hoplite.db import interface
 
 
-@dataclass
-class RecordingDisplay:
-    """Data for displaying a single recording window."""
+class ExamineState(ConfigState):
+    """State management for the examine page."""
 
-    filename: str
-    offsets: str
-    labels: str
-    spec_file: str | None
-    recording_file: str | None
-    window_id: int
-    labels_list: list[str]
+    # Search and filter state
+    search_query: str = ""
+    all_labels: list[str] = []
+    filtered_labels: list[str] = []
+    selected_label: Optional[str] = None
 
+    # Recording display state
+    recordings: list[dict] = []
 
-def examine(
-    config: config.Config,
-    analyzer_db: db.AnalyzerDB,
-    hoplite_db: sqlite_usearch_impl.SQLiteUSearchDB,
-) -> gr.Blocks:
-    hoplite_db = hoplite_db.thread_split()
-    all_labels: list[str] = list(
-        hoplite_db.get_all_labels(label_type=interface.LabelType.POSITIVE)
-    )
+    # Edit state for each recording (using window_id as key)
+    editing_window_id: Optional[int] = None
+    edit_labels: list[str] = []
+    edit_window_offsets: str = ""
 
-    def filter_labels(search_query: str) -> list[list[str]]:
-        """Filter labels based on search query"""
-        if not search_query:
-            return [[label] for label in all_labels]
-        search_lower: str = search_query.lower()
-        filtered: list[str] = [
-            label for label in all_labels if search_lower in label.lower()
-        ]
-        return [[label] for label in filtered]
+    @rx.event
+    def on_mount_handler(self):
+        """Initialize state when component mounts."""
+        self.load_labels()
 
-    def get_recordings_for_label(label: str) -> list[RecordingDisplay]:
-        """Get all recordings with the selected label."""
-        # Create new DB connection for this thread
-        thread_hoplite_db = hoplite_db.thread_split()
+    def load_labels(self):
+        """Load all labels from the database."""
+        hoplite_db = self.get_hoplite_db().thread_split()
+        self.all_labels = list(
+            hoplite_db.get_all_labels(label_type=interface.LabelType.POSITIVE)
+        )
+        self.filtered_labels = self.all_labels.copy()
 
-        windows = examine_annotations.get_windows_by_label(thread_hoplite_db, label)
-        recordings: list[RecordingDisplay] = []
+    def update_search_query(self, query: str):
+        """Update search query and filter labels."""
+        self.search_query = query
+        if not query:
+            self.filtered_labels = self.all_labels.copy()
+        else:
+            search_lower = query.lower()
+            self.filtered_labels = [
+                label for label in self.all_labels if search_lower in label.lower()
+            ]
 
+    def select_label_by_index(self, index: int):
+        """Select a label by its index in the filtered list."""
+        if 0 <= index < len(self.filtered_labels):
+            label = self.filtered_labels[index]
+            self.selected_label = label
+            self.editing_window_id = None
+            self.load_recordings_for_label(label)
+
+    def load_recordings_for_label(self, label: str):
+        """Load all recordings with the selected label."""
+        hoplite_db = self.get_hoplite_db().thread_split()
+        windows = examine_annotations.get_windows_by_label(hoplite_db, label)
+
+        recordings = []
         for window_with_annotations in windows:
             recording_file, spec_file = audio_windows.get_audio_window_path(
-                config=config,
-                hoplite_db=thread_hoplite_db,
+                config=self.config,
+                hoplite_db=hoplite_db,
                 window_id=window_with_annotations.window.id,
             )
 
-            # Get all labels for this window
             labels_list = [ann.label for ann in window_with_annotations.annotations]
 
+            # Convert absolute paths to backend URLs
+            # Get backend URL from environment variables (set by Reflex)
+            backend_host = os.getenv("BACKEND_HOST", "localhost")
+            backend_port = os.getenv("BACKEND_PORT", "8000")
+            backend_url = f"http://{backend_host}:{backend_port}"
+
+            spec_relative = "/" + str(spec_file.relative_to(Path.cwd()))
+            audio_relative = "/" + str(recording_file.relative_to(Path.cwd()))
+
+            spec_url = f"{backend_url}{spec_relative}"
+            audio_url = f"{backend_url}{audio_relative}"
+
             recordings.append(
-                RecordingDisplay(
-                    filename=window_with_annotations.recording.filename,
-                    offsets=f"{window_with_annotations.window.offsets[0]:.2f}s - {window_with_annotations.window.offsets[1]:.2f}s",
-                    labels=", ".join(labels_list),
-                    spec_file=str(spec_file),
-                    recording_file=str(recording_file),
-                    window_id=window_with_annotations.window.id,
-                    labels_list=labels_list,
-                )
+                {
+                    "window_id": window_with_annotations.window.id,
+                    "filename": window_with_annotations.recording.filename,
+                    "offsets": f"{window_with_annotations.window.offsets[0]:.2f}s - {window_with_annotations.window.offsets[1]:.2f}s",
+                    "labels": labels_list,
+                    "labels_str": ", ".join(labels_list),
+                    "spec_file": spec_url,
+                    "recording_file": audio_url,
+                }
             )
 
-        return recordings
+        self.recordings = recordings
 
-    with gr.Blocks() as examine_blocks:
-        with gr.Row():
-            # Left column: Searchable label list (1/3 width)
-            with gr.Column(scale=1):
-                gr.Markdown("## Labels")
-                search_box = gr.Textbox(
-                    placeholder="Search labels...", label="Search", container=False
-                )
-                label_list = gr.Dataframe(
-                    headers=["Label"],
-                    datatype=["str"],
-                    value=[[label] for label in all_labels],
-                    interactive=False,
-                    max_height=600,
-                    wrap=True,
-                )
+    def start_editing_by_index(self, index: int):
+        """Start editing labels for a recording by its index."""
+        if 0 <= index < len(self.recordings):
+            rec = self.recordings[index]
+            self.editing_window_id = rec["window_id"]
+            self.edit_labels = rec["labels"].copy()
+            self.edit_window_offsets = rec["offsets"]
 
-            # Right column: Recordings display (2/3 width)
-            with gr.Column(scale=2):
-                gr.Markdown("## Recordings")
-                selected_label_state = gr.State(value=None)
+    def cancel_editing(self):
+        """Cancel editing labels."""
+        self.editing_window_id = None
+        self.edit_labels = []
+        self.edit_window_offsets = ""
 
-                @gr.render(inputs=[selected_label_state])
-                def render_recordings(selected_label: str | None):
-                    if selected_label is None:
-                        gr.Markdown("Select a label to view recordings.")
-                        return
+    def toggle_edit_label_by_index(self, index: int):
+        """Toggle a label in the edit list by its index."""
+        if 0 <= index < len(self.all_labels):
+            label = self.all_labels[index]
+            if label in self.edit_labels:
+                self.edit_labels = [lbl for lbl in self.edit_labels if lbl != label]
+            else:
+                self.edit_labels = self.edit_labels + [label]
 
-                    recordings = get_recordings_for_label(selected_label)
+    def save_current_labels(self):
+        """Save edited labels to database."""
+        if not self.edit_labels or self.editing_window_id is None:
+            return
 
-                    if not recordings:
-                        gr.Markdown("No recordings found for this label.")
-                        return
+        hoplite_db = self.get_hoplite_db().thread_split()
 
-                    for rec in recordings:
-                        rec
-                        with gr.Group() as recording_group:
-                            gr.Markdown(f"### {rec.filename}")
+        # Update labels in database
+        examine_annotations.update_labels(
+            config=self.config,
+            hoplite_db=hoplite_db,
+            window_id=self.editing_window_id,
+            new_labels=self.edit_labels,
+        )
+        hoplite_db.commit()
 
-                            labels_display = gr.Markdown(
-                                f"**Offsets:** {rec.offsets}  \n**Labels:** {rec.labels}",
-                                elem_id=f"labels_{rec.window_id}",
-                            )
+        # Check if the current selected label was removed
+        if self.selected_label and self.selected_label not in self.edit_labels:
+            # Remove this recording from the display
+            self.recordings = [
+                rec
+                for rec in self.recordings
+                if rec["window_id"] != self.editing_window_id
+            ]
+        else:
+            # Update the recording in the list
+            for rec in self.recordings:
+                if rec["window_id"] == self.editing_window_id:
+                    rec["labels"] = self.edit_labels.copy()
+                    rec["labels_str"] = ", ".join(self.edit_labels)
+                    break
 
-                            # Hidden state to store window info
-                            window_id_state = gr.State(value=rec.window_id)
-                            offsets_state = gr.State(value=rec.offsets)
-                            selected_label_filter = gr.State(value=selected_label)
+        # Clear editing state
+        self.editing_window_id = None
+        self.edit_labels = []
+        self.edit_window_offsets = ""
 
-                            # Edit button and controls in a clean layout
-                            edit_btn = gr.Button(
-                                "Edit Labels", size="sm", variant="secondary"
-                            )
 
-                            with gr.Column(visible=False) as edit_section:
-                                edit_dropdown = gr.Dropdown(
-                                    choices=all_labels,
-                                    value=rec.labels_list,
-                                    multiselect=True,
-                                    allow_custom_value=True,
-                                    label="Labels",
-                                    interactive=True,
-                                )
-                                with gr.Row():
-                                    save_btn = gr.Button(
-                                        "Save",
-                                        variant="primary",
-                                        size="sm",
-                                        interactive=len(rec.labels_list) > 0,
-                                    )
-                                    cancel_btn = gr.Button("Cancel", size="sm")
+# Reusable Components
 
-                            gr.Image(
-                                value=rec.spec_file,
-                                height=350,
-                                show_label=False,
-                                container=False,
-                            )
-                            gr.Audio(
-                                value=rec.recording_file,
-                                show_label=False,
-                                container=False,
-                            )
 
-                            # Event handlers for this recording
-                            def show_edit():
-                                return gr.Column(visible=True)
+def search_box() -> rx.Component:
+    """Search box component for filtering labels."""
+    return rx.input(
+        placeholder="Search labels...",
+        value=ExamineState.search_query,
+        on_change=ExamineState.update_search_query,
+        width="100%",
+    )
 
-                            def hide_edit():
-                                return gr.Column(visible=False)
 
-                            def update_save_button(labels: list[str]) -> gr.Button:
-                                """Enable save button only when at least one label is selected."""
-                                return gr.Button(
-                                    interactive=len(labels) > 0 if labels else False
-                                )
+def labels_panel() -> rx.Component:
+    """Left panel showing searchable list of labels."""
+    return rx.vstack(
+        rx.heading("Labels", size="6"),
+        search_box(),
+        rx.box(
+            rx.cond(
+                ExamineState.filtered_labels.length() > 0,
+                rx.vstack(
+                    rx.foreach(
+                        rx.Var.range(ExamineState.filtered_labels.length()),
+                        lambda i: rx.box(
+                            rx.text(ExamineState.filtered_labels[i], size="3"),
+                            padding="0.75em",
+                            border_radius="0.5em",
+                            _hover={
+                                "background_color": rx.color("accent", 3),
+                                "cursor": "pointer",
+                            },
+                            on_click=ExamineState.select_label_by_index(i),
+                        ),
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                rx.text("No labels found", size="2", color="gray"),
+            ),
+            max_height="600px",
+            overflow_y="auto",
+            width="100%",
+            border=f"1px solid {rx.color('gray', 6)}",
+            border_radius="0.5em",
+            padding="0.5em",
+        ),
+        spacing="4",
+        width="100%",
+        align="start",
+    )
 
-                            def save_labels_handler(
-                                new_labels: list[str],
-                                window_id: int,
-                                offsets: str,
-                                current_label: str,
-                            ) -> tuple:
-                                # Create new DB connection for this thread
-                                thread_hoplite_db = hoplite_db.thread_split()
 
-                                # Update labels in database
-                                examine_annotations.update_labels(
-                                    config=config,
-                                    hoplite_db=thread_hoplite_db,
-                                    window_id=window_id,
-                                    new_labels=new_labels,
-                                )
-                                thread_hoplite_db.commit()
+def recording_card(recording: dict, index: int) -> rx.Component:
+    """Card component for displaying a single recording."""
 
-                                # Check if the current label was removed
-                                if current_label not in new_labels:
-                                    # Hide the entire recording group
-                                    return (
-                                        "",
-                                        gr.Column(visible=False),
-                                        gr.Group(visible=False),
-                                    )
+    return rx.card(
+        rx.vstack(
+            # Header with filename
+            rx.heading(recording["filename"], size="5"),
+            # Offsets and labels display
+            rx.vstack(
+                rx.text(
+                    f"Offsets: {recording['offsets']}",
+                    size="2",
+                    weight="bold",
+                ),
+                rx.text(
+                    f"Labels: {recording['labels_str']}",
+                    size="2",
+                ),
+                spacing="1",
+                align="start",
+                width="100%",
+            ),
+            # Edit button (only show when not editing this recording)
+            rx.cond(
+                ExamineState.editing_window_id != recording["window_id"],
+                rx.button(
+                    "Edit Labels",
+                    on_click=ExamineState.start_editing_by_index(index),
+                    variant="outline",
+                    size="2",
+                ),
+                # Edit section (show when editing this recording)
+                rx.cond(
+                    ExamineState.editing_window_id == recording["window_id"],
+                    rx.vstack(
+                        rx.text("Select labels:", size="2", weight="bold"),
+                        rx.box(
+                            rx.vstack(
+                                rx.foreach(
+                                    rx.Var.range(ExamineState.all_labels.length()),
+                                    lambda label_idx: rx.checkbox(
+                                        rx.text(
+                                            ExamineState.all_labels[label_idx], size="2"
+                                        ),
+                                        checked=ExamineState.edit_labels.contains(
+                                            ExamineState.all_labels[label_idx]
+                                        ),
+                                        on_change=ExamineState.toggle_edit_label_by_index(
+                                            label_idx
+                                        ),
+                                    ),
+                                ),
+                                spacing="1",
+                                width="100%",
+                            ),
+                            max_height="200px",
+                            overflow_y="auto",
+                            width="100%",
+                        ),
+                        rx.hstack(
+                            rx.button(
+                                "Save",
+                                on_click=ExamineState.save_current_labels,
+                                variant="solid",
+                                size="2",
+                                disabled=ExamineState.edit_labels.length() == 0,
+                            ),
+                            rx.button(
+                                "Cancel",
+                                on_click=ExamineState.cancel_editing,
+                                variant="outline",
+                                size="2",
+                            ),
+                            spacing="2",
+                        ),
+                        spacing="2",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
+            ),
+            # Spectrogram image
+            rx.image(
+                src=recording["spec_file"],
+                alt="Spectrogram",
+                width="100%",
+                height="auto",
+                max_height="350px",
+                object_fit="contain",
+            ),
+            # Audio player
+            rx.audio(
+                src=recording["recording_file"],
+                controls=True,
+                width="100%",
+                preload=None,
+            ),
+            spacing="4",
+            width="100%",
+            align="start",
+        ),
+        width="100%",
+    )
 
-                                # Return updated markdown string and hide modal
-                                labels_str = (
-                                    ", ".join(new_labels) if new_labels else "None"
-                                )
-                                return (
-                                    f"**Offsets:** {offsets}  \n**Labels:** {labels_str}",
-                                    gr.Column(visible=False),
-                                    gr.Group(visible=True),
-                                )
 
-                            edit_btn.click(fn=show_edit, outputs=[edit_section])
-                            cancel_btn.click(fn=hide_edit, outputs=[edit_section])
-                            edit_dropdown.change(
-                                fn=update_save_button,
-                                inputs=[edit_dropdown],
-                                outputs=[save_btn],
-                            )
-                            save_btn.click(
-                                fn=save_labels_handler,
-                                inputs=[
-                                    edit_dropdown,
-                                    window_id_state,
-                                    offsets_state,
-                                    selected_label_filter,
-                                ],
-                                outputs=[labels_display, edit_section, recording_group],
-                            )
+def recordings_panel() -> rx.Component:
+    """Right panel showing recordings for selected label."""
+    return rx.vstack(
+        rx.heading("Recordings", size="6"),
+        rx.cond(
+            ExamineState.selected_label,
+            rx.cond(
+                ExamineState.recordings.length() > 0,
+                rx.vstack(
+                    rx.foreach(
+                        rx.Var.range(ExamineState.recordings.length()),
+                        lambda i: recording_card(ExamineState.recordings[i], i),
+                    ),
+                    spacing="4",
+                    width="100%",
+                    overflow_y="auto",
+                ),
+                rx.text("No recordings found for this label.", size="3"),
+            ),
+            rx.text("Select a label to view recordings.", size="3"),
+        ),
+        spacing="4",
+        width="100%",
+        align="start",
+    )
 
-        # Wire up the search functionality
-        search_box.change(fn=filter_labels, inputs=[search_box], outputs=[label_list])
 
-        # Wire up label selection to update state
-        def update_selected_label(evt: gr.SelectData) -> str:
-            return evt.value
-
-        label_list.select(fn=update_selected_label, outputs=[selected_label_state])
-
-    return examine_blocks
+def examine() -> rx.Component:
+    """Main examine page component."""
+    return rx.container(
+        rx.hstack(
+            # Left column: Labels (1/3 width)
+            rx.box(
+                labels_panel(),
+                flex="1",
+                min_width="250px",
+                height="fit-content",
+            ),
+            # Right column: Recordings (2/3 width)
+            rx.box(
+                recordings_panel(),
+                flex="2",
+                min_width="400px",
+                height="fit-content",
+            ),
+            spacing="6",
+            width="100%",
+            align_items="start",
+        ),
+        on_mount=ExamineState.on_mount_handler,
+        size="4",
+        padding="2em",
+    )

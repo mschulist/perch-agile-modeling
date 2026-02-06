@@ -101,11 +101,7 @@ def get_window_display_data(
     )
 
 
-def annotate(
-    config: config.Config,
-    analyzer_db: db.AnalyzerDB,
-    hoplite_db: sqlite_usearch_impl.SQLiteUSearchDB,
-) -> gr.Blocks:
+def annotate() -> :
     def submit_annotations(
         labels: list[str], current_window: examine_annotations.WindowWithAnnotations
     ) -> UIUpdate:

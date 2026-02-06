@@ -40,7 +40,7 @@ def get_audio_window_path(
             spec_file=spec_file,
         )
 
-    return recording_file, spec_file
+    return recording_file.absolute(), spec_file.absolute()
 
 
 def flush_window_to_disk(
