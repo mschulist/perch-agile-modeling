@@ -130,8 +130,11 @@ class ExamineState(ConfigState):
             backend_port = os.getenv("BACKEND_PORT", "8000")
             backend_url = f"http://{backend_host}:{backend_port}"
 
-            spec_relative = "/" + str(spec_file.relative_to(Path.cwd()))
-            audio_relative = "/" + str(recording_file.relative_to(Path.cwd()))
+            # Compute paths using /data prefix, which is what the backend uses to fetch 
+            # data from the data_dir (for spectrograms and audio)
+            data_path = Path(self.config.data_path)
+            spec_relative = "/data/" + str(spec_file.relative_to(data_path))
+            audio_relative = "/data/" + str(recording_file.relative_to(data_path))
 
             spec_url = f"{backend_url}{spec_relative}"
             audio_url = f"{backend_url}{audio_relative}"
