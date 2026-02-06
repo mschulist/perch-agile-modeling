@@ -1,12 +1,14 @@
 import reflex as rx
+import os
 from perch_analyzer.config.config import Config
 from perch_analyzer.db import db
 from perch_hoplite.db import sqlite_usearch_impl
 
-TMP_DATA_PATH = "data"
+# Get data path from environment variable, fallback to "data" for backwards compatibility
+DATA_DIR = os.environ.get("PERCH_ANALYZER_DATA_DIR", "data")
 
 # Global config loaded once
-_config = Config.load(TMP_DATA_PATH)
+_config = Config.load(DATA_DIR)
 
 
 class ConfigState(rx.State):

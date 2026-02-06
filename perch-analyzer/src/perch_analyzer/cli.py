@@ -6,6 +6,7 @@ from perch_analyzer.target_recordings import target_recordings
 from perch_analyzer.db import db
 from perch_analyzer.search import search
 from perch_analyzer.classify import classifier, classify
+from perch_analyzer.gui import gui_loader
 from perch_hoplite.db import sqlite_usearch_impl
 
 
@@ -29,18 +30,6 @@ def main():
     # GUI subcommand
     gui_parser = subparsers.add_parser("gui", help="Launch the GUI interface")
     gui_parser.add_argument("--data_dir", type=Path, required=True)
-    gui_parser.add_argument(
-        "--share", action="store_true", help="Create a public share link"
-    )
-    gui_parser.add_argument(
-        "--server-name",
-        type=str,
-        default="127.0.0.1",
-        help="Server name (default: 127.0.0.1)",
-    )
-    gui_parser.add_argument(
-        "--server-port", type=int, default=7860, help="Server port (default: 7860)"
-    )
 
     # Embed subcommand
     embed_parser = subparsers.add_parser("embed", help="Generate embeddings from audio")
@@ -102,7 +91,11 @@ def main():
 
     # Route to appropriate section
     if args.module == "gui":
-        raise NotImplementedError("GUI is a work in progress!")
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
+        gui_loader.start_gui(str(args.data_dir))
     elif args.module == "embed":
         if not initialize_directory.check_initialized(args.data_dir):
             raise ValueError(

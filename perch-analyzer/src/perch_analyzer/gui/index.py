@@ -1,4 +1,5 @@
 import reflex as rx
+import os
 from pathlib import Path
 from starlette.staticfiles import StaticFiles
 from perch_analyzer.gui import (
@@ -45,5 +46,6 @@ app.add_page(lambda: with_navbar(classifiers_page.classifiers()), route="/classi
 app.add_page(lambda: with_navbar(summary_page.summary()), route="/summary")
 
 # Mount the data directory as static files
-data_path = Path("data").absolute()
+# Get data path from environment variable, fallback to "data" for backwards compatibility
+data_path = Path(os.environ.get("PERCH_ANALYZER_DATA_DIR", "data")).absolute()
 app._api.mount("/data", StaticFiles(directory=str(data_path)), name="data")  # type: ignore
