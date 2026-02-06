@@ -327,6 +327,7 @@ def labels_panel() -> rx.Component:
                             rx.text(ExamineState.filtered_labels[i], size="3"),
                             padding="0.75em",
                             border_radius="0.5em",
+                            width="100%",
                             _hover={
                                 "background_color": rx.color("accent", 3),
                                 "cursor": "pointer",
@@ -382,6 +383,7 @@ def window_card(window: WindowWithMetadata, index: int) -> rx.Component:
                     on_click=ExamineState.start_editing_by_index(index),
                     variant="outline",
                     size="2",
+                    cursor="pointer",
                 ),
                 # Edit section (show when editing this recording)
                 rx.cond(
@@ -395,12 +397,14 @@ def window_card(window: WindowWithMetadata, index: int) -> rx.Component:
                                 variant="solid",
                                 size="2",
                                 disabled=ExamineState.edit_labels.length() == 0,
+                                cursor="pointer"
                             ),
                             rx.button(
                                 "Cancel",
                                 on_click=ExamineState.cancel_editing,
                                 variant="outline",
                                 size="2",
+                                cursor="pointer"
                             ),
                             spacing="2",
                         ),
