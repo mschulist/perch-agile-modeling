@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import reflex as rx
 from typing import Optional
 from pathlib import Path
@@ -5,6 +6,16 @@ import os
 from perch_analyzer.gui.state import ConfigState
 from perch_analyzer.examine import examine_annotations, audio_windows
 from perch_hoplite.db import interface
+
+
+@dataclass
+class WindowWithMetadata:
+    window_id: int
+    filename: str
+    offsets: list[float]
+    labels: list[str]
+    spec_file: str
+    audio_file: str
 
 
 class ExamineState(ConfigState):
@@ -16,13 +27,12 @@ class ExamineState(ConfigState):
     filtered_labels: list[str] = []
     selected_label: Optional[str] = None
 
-    # Recording display state
-    recordings: list[dict] = []
+    # Windows display state
+    windows: list[WindowWithMetadata] = []
 
     # Edit state for each recording (using window_id as key)
     editing_window_id: Optional[int] = None
     edit_labels: list[str] = []
-    edit_window_offsets: str = ""
 
     @rx.event
     def on_mount_handler(self):
@@ -37,6 +47,7 @@ class ExamineState(ConfigState):
         )
         self.filtered_labels = self.all_labels.copy()
 
+    @rx.event
     def update_search_query(self, query: str):
         """Update search query and filter labels."""
         self.search_query = query
@@ -61,7 +72,7 @@ class ExamineState(ConfigState):
         hoplite_db = self.get_hoplite_db().thread_split()
         windows = examine_annotations.get_windows_by_label(hoplite_db, label)
 
-        recordings = []
+        windows_with_metadata: list[WindowWithMetadata] = []
         for window_with_annotations in windows:
             recording_file, spec_file = audio_windows.get_audio_window_path(
                 config=self.config,
@@ -83,33 +94,30 @@ class ExamineState(ConfigState):
             spec_url = f"{backend_url}{spec_relative}"
             audio_url = f"{backend_url}{audio_relative}"
 
-            recordings.append(
-                {
-                    "window_id": window_with_annotations.window.id,
-                    "filename": window_with_annotations.recording.filename,
-                    "offsets": f"{window_with_annotations.window.offsets[0]:.2f}s - {window_with_annotations.window.offsets[1]:.2f}s",
-                    "labels": labels_list,
-                    "labels_str": ", ".join(labels_list),
-                    "spec_file": spec_url,
-                    "recording_file": audio_url,
-                }
+            windows_with_metadata.append(
+                WindowWithMetadata(
+                    window_id=window_with_annotations.window.id,
+                    filename=window_with_annotations.recording.filename,
+                    offsets=window_with_annotations.window.offsets,
+                    labels=labels_list,
+                    spec_file=spec_url,
+                    audio_file=audio_url,
+                )
             )
 
-        self.recordings = recordings
+        self.windows = windows_with_metadata
 
     def start_editing_by_index(self, index: int):
         """Start editing labels for a recording by its index."""
-        if 0 <= index < len(self.recordings):
-            rec = self.recordings[index]
-            self.editing_window_id = rec["window_id"]
-            self.edit_labels = rec["labels"].copy()
-            self.edit_window_offsets = rec["offsets"]
+        if 0 <= index < len(self.windows):
+            window = self.windows[index]
+            self.editing_window_id = window.window_id
+            self.edit_labels = window.labels.copy()
 
     def cancel_editing(self):
         """Cancel editing labels."""
         self.editing_window_id = None
         self.edit_labels = []
-        self.edit_window_offsets = ""
 
     def toggle_edit_label_by_index(self, index: int):
         """Toggle a label in the edit list by its index."""
@@ -139,23 +147,21 @@ class ExamineState(ConfigState):
         # Check if the current selected label was removed
         if self.selected_label and self.selected_label not in self.edit_labels:
             # Remove this recording from the display
-            self.recordings = [
-                rec
-                for rec in self.recordings
-                if rec["window_id"] != self.editing_window_id
+            self.windows = [
+                window
+                for window in self.windows
+                if window.window_id != self.editing_window_id
             ]
         else:
             # Update the recording in the list
-            for rec in self.recordings:
-                if rec["window_id"] == self.editing_window_id:
-                    rec["labels"] = self.edit_labels.copy()
-                    rec["labels_str"] = ", ".join(self.edit_labels)
+            for window in self.windows:
+                if window.window_id == self.editing_window_id:
+                    window.labels = self.edit_labels.copy()
                     break
 
         # Clear editing state
         self.editing_window_id = None
         self.edit_labels = []
-        self.edit_window_offsets = ""
 
 
 # Reusable Components
@@ -178,10 +184,10 @@ def labels_panel() -> rx.Component:
         search_box(),
         rx.box(
             rx.cond(
-                ExamineState.filtered_labels.length() > 0,
+                ExamineState.filtered_labels,
                 rx.vstack(
                     rx.foreach(
-                        rx.Var.range(ExamineState.filtered_labels.length()),
+                        rx.Var.range(ExamineState.filtered_labels.length()),  # type: ignore
                         lambda i: rx.box(
                             rx.text(ExamineState.filtered_labels[i], size="3"),
                             padding="0.75em",
@@ -190,7 +196,7 @@ def labels_panel() -> rx.Component:
                                 "background_color": rx.color("accent", 3),
                                 "cursor": "pointer",
                             },
-                            on_click=ExamineState.select_label_by_index(i),
+                            on_click=ExamineState.select_label_by_index(i),  # type: ignore
                         ),
                     ),
                     spacing="1",
@@ -211,22 +217,22 @@ def labels_panel() -> rx.Component:
     )
 
 
-def recording_card(recording: dict, index: int) -> rx.Component:
-    """Card component for displaying a single recording."""
+def window_card(window: WindowWithMetadata, index: int) -> rx.Component:
+    """Card component for displaying a single window."""
 
     return rx.card(
         rx.vstack(
             # Header with filename
-            rx.heading(recording["filename"], size="5"),
+            rx.heading(window.filename, size="5"),
             # Offsets and labels display
             rx.vstack(
                 rx.text(
-                    f"Offsets: {recording['offsets']}",
+                    f"Offsets: {window.offsets[0]}",
                     size="2",
                     weight="bold",
                 ),
                 rx.text(
-                    f"Labels: {recording['labels_str']}",
+                    f"Labels: {window.labels}",
                     size="2",
                 ),
                 spacing="1",
@@ -235,7 +241,7 @@ def recording_card(recording: dict, index: int) -> rx.Component:
             ),
             # Edit button (only show when not editing this recording)
             rx.cond(
-                ExamineState.editing_window_id != recording["window_id"],
+                ExamineState.editing_window_id != window.window_id,
                 rx.button(
                     "Edit Labels",
                     on_click=ExamineState.start_editing_by_index(index),
@@ -244,7 +250,7 @@ def recording_card(recording: dict, index: int) -> rx.Component:
                 ),
                 # Edit section (show when editing this recording)
                 rx.cond(
-                    ExamineState.editing_window_id == recording["window_id"],
+                    ExamineState.editing_window_id == window.window_id,
                     rx.vstack(
                         rx.text("Select labels:", size="2", weight="bold"),
                         rx.box(
@@ -294,7 +300,7 @@ def recording_card(recording: dict, index: int) -> rx.Component:
             ),
             # Spectrogram image
             rx.image(
-                src=recording["spec_file"],
+                src=window.spec_file,
                 alt="Spectrogram",
                 width="100%",
                 height="auto",
@@ -303,7 +309,7 @@ def recording_card(recording: dict, index: int) -> rx.Component:
             ),
             # Audio player
             rx.audio(
-                src=recording["recording_file"],
+                src=window.audio_file,
                 controls=True,
                 width="100%",
                 preload=None,
@@ -316,26 +322,33 @@ def recording_card(recording: dict, index: int) -> rx.Component:
     )
 
 
-def recordings_panel() -> rx.Component:
+def windows_panel() -> rx.Component:
     """Right panel showing recordings for selected label."""
     return rx.vstack(
-        rx.heading("Recordings", size="6"),
+        rx.heading(
+            rx.cond(
+                ExamineState.selected_label,
+                f"Recordings: ({ExamineState.selected_label})",
+                "Recordings",
+            ),
+            size="6",
+        ),
         rx.cond(
             ExamineState.selected_label,
             rx.cond(
-                ExamineState.recordings.length() > 0,
+                ExamineState.windows.length() > 0,  # type: ignore
                 rx.vstack(
                     rx.foreach(
-                        rx.Var.range(ExamineState.recordings.length()),
-                        lambda i: recording_card(ExamineState.recordings[i], i),
+                        rx.Var.range(ExamineState.windows.length()),  # type: ignore
+                        lambda i: window_card(ExamineState.windows[i], i),
                     ),
                     spacing="4",
                     width="100%",
                     overflow_y="auto",
                 ),
-                rx.text("No recordings found for this label.", size="3"),
+                rx.text("No windows found for this label.", size="3"),
             ),
-            rx.text("Select a label to view recordings.", size="3"),
+            rx.text("Select a label to view windows.", size="3"),
         ),
         spacing="4",
         width="100%",
@@ -347,17 +360,17 @@ def examine() -> rx.Component:
     """Main examine page component."""
     return rx.container(
         rx.hstack(
-            # Left column: Labels (1/3 width)
+            # Left column: Labels (1/4 width)
             rx.box(
                 labels_panel(),
                 flex="1",
                 min_width="250px",
                 height="fit-content",
             ),
-            # Right column: Recordings (2/3 width)
+            # Right column: Recordings (3/4 width)
             rx.box(
-                recordings_panel(),
-                flex="2",
+                windows_panel(),
+                flex="3",
                 min_width="400px",
                 height="fit-content",
             ),
@@ -368,4 +381,5 @@ def examine() -> rx.Component:
         on_mount=ExamineState.on_mount_handler,
         size="4",
         padding="2em",
+        width="100%",
     )
