@@ -1,5 +1,6 @@
 import reflex as rx
 import os
+from pathlib import Path
 from perch_analyzer.config.config import Config
 from perch_analyzer.db import db
 from perch_hoplite.db import sqlite_usearch_impl
@@ -9,6 +10,10 @@ DATA_DIR = os.environ.get("PERCH_ANALYZER_DATA_DIR", "data")
 
 # Global config loaded once
 _config = Config.load(DATA_DIR)
+
+# Override the data_path in config with the absolute path we're using
+# This ensures all database connections use the correct absolute path
+_config.data_path = str(Path(DATA_DIR).absolute())
 
 
 class ConfigState(rx.State):
