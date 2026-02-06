@@ -33,12 +33,52 @@ class ExamineState(ConfigState):
     # Edit state for each recording (using window_id as key)
     editing_window_id: Optional[int] = None
     edit_labels: list[str] = []
+    label_search: str = ""
+    filtered_label_suggestions: list[str] = []
+
+    @rx.event
+    def update_label_search(self, query: str):
+        """Update label search and filter suggestions."""
+        self.label_search = query
+        if not query:
+            self.filtered_label_suggestions = []
+        else:
+            search_lower = query.lower()
+            # Filter labels not already selected
+            self.filtered_label_suggestions = [
+                label
+                for label in self.all_labels
+                if search_lower in label.lower() and label not in self.edit_labels
+            ][:10]  # Limit to 10 suggestions
+
+    @rx.event
+    def add_label(self, label: str):
+        """Add a label to the edit list."""
+        if label and label not in self.edit_labels:
+            self.edit_labels = self.edit_labels + [label]
+            # Add to all_labels if it's a new label
+            if label not in self.all_labels:
+                self.all_labels = self.all_labels + [label]
+        self.label_search = ""
+        self.filtered_label_suggestions = []
+
+    @rx.event
+    def add_current_search_as_label(self):
+        """Add the current search text as a new label."""
+        if self.label_search.strip():
+            self.add_label(self.label_search.strip())
+
+    @rx.event
+    def remove_edit_label(self, label: str):
+        """Remove a label from the edit list."""
+        self.edit_labels = [lbl for lbl in self.edit_labels if lbl != label]
 
     @rx.event
     def on_mount_handler(self):
         """Initialize state when component mounts."""
         self.load_labels()
 
+    @rx.event
     def load_labels(self):
         """Load all labels from the database."""
         hoplite_db = self.get_hoplite_db().thread_split()
@@ -59,6 +99,7 @@ class ExamineState(ConfigState):
                 label for label in self.all_labels if search_lower in label.lower()
             ]
 
+    @rx.event
     def select_label_by_index(self, index: int):
         """Select a label by its index in the filtered list."""
         if 0 <= index < len(self.filtered_labels):
@@ -67,6 +108,7 @@ class ExamineState(ConfigState):
             self.editing_window_id = None
             self.load_recordings_for_label(label)
 
+    @rx.event
     def load_recordings_for_label(self, label: str):
         """Load all recordings with the selected label."""
         hoplite_db = self.get_hoplite_db().thread_split()
@@ -107,6 +149,7 @@ class ExamineState(ConfigState):
 
         self.windows = windows_with_metadata
 
+    @rx.event
     def start_editing_by_index(self, index: int):
         """Start editing labels for a recording by its index."""
         if 0 <= index < len(self.windows):
@@ -114,20 +157,13 @@ class ExamineState(ConfigState):
             self.editing_window_id = window.window_id
             self.edit_labels = window.labels.copy()
 
+    @rx.event
     def cancel_editing(self):
         """Cancel editing labels."""
         self.editing_window_id = None
         self.edit_labels = []
 
-    def toggle_edit_label_by_index(self, index: int):
-        """Toggle a label in the edit list by its index."""
-        if 0 <= index < len(self.all_labels):
-            label = self.all_labels[index]
-            if label in self.edit_labels:
-                self.edit_labels = [lbl for lbl in self.edit_labels if lbl != label]
-            else:
-                self.edit_labels = self.edit_labels + [label]
-
+    @rx.event
     def save_current_labels(self):
         """Save edited labels to database."""
         if not self.edit_labels or self.editing_window_id is None:
@@ -162,9 +198,108 @@ class ExamineState(ConfigState):
         # Clear editing state
         self.editing_window_id = None
         self.edit_labels = []
+        self.label_search = ""
+        self.filtered_label_suggestions = []
 
 
 # Reusable Components
+
+
+def label_multiselect() -> rx.Component:
+    """Multiselect component for editing labels with search and create functionality."""
+    return rx.vstack(
+        rx.text("Select or create labels:", size="2", weight="bold"),
+        # Input field with add button
+        rx.hstack(
+            rx.input(
+                placeholder="Type to search or create...",
+                value=ExamineState.label_search,
+                on_change=ExamineState.update_label_search,
+                width="100%",
+                size="2",
+            ),
+            rx.button(
+                "Add",
+                on_click=ExamineState.add_current_search_as_label,
+                disabled=ExamineState.label_search == "",
+                size="2",
+                variant="solid",
+            ),
+            spacing="2",
+            width="100%",
+        ),
+        # Dropdown suggestions
+        rx.cond(
+            ExamineState.filtered_label_suggestions.length() > 0,
+            rx.box(
+                rx.vstack(
+                    rx.foreach(
+                        ExamineState.filtered_label_suggestions,
+                        lambda label: rx.box(
+                            rx.text(label, size="2"),
+                            padding="0.5em",
+                            border_radius="0.25em",
+                            _hover={
+                                "background_color": rx.color("accent", 3),
+                                "cursor": "pointer",
+                            },
+                            on_click=lambda: ExamineState.add_label(label),
+                            width="100%",
+                        ),
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                width="100%",
+                padding="0.5em",
+                border=f"1px solid {rx.color('gray', 6)}",
+                border_radius="0.5em",
+                max_height="150px",
+                overflow_y="auto",
+                background_color=rx.color("gray", 1),
+            ),
+            rx.fragment(),
+        ),
+        # Show selected labels as removable badges
+        rx.cond(
+            ExamineState.edit_labels.length() > 0,
+            rx.box(
+                rx.foreach(
+                    ExamineState.edit_labels,
+                    lambda label: rx.badge(
+                        rx.hstack(
+                            rx.text(label, size="2"),
+                            rx.icon(
+                                "x",
+                                size=14,
+                                cursor="pointer",
+                                on_click=lambda: ExamineState.remove_edit_label(label),
+                            ),
+                            spacing="1",
+                            align="center",
+                        ),
+                        variant="solid",
+                        size="2",
+                        margin="0.25em",
+                    ),
+                ),
+                width="100%",
+                padding="0.5em",
+                border=f"1px solid {rx.color('gray', 6)}",
+                border_radius="0.5em",
+                min_height="3em",
+            ),
+            rx.box(
+                rx.text("No labels selected", size="2", color="gray"),
+                width="100%",
+                padding="0.5em",
+                border=f"1px solid {rx.color('gray', 6)}",
+                border_radius="0.5em",
+            ),
+        ),
+        spacing="2",
+        width="100%",
+    )
 
 
 def search_box() -> rx.Component:
@@ -252,30 +387,7 @@ def window_card(window: WindowWithMetadata, index: int) -> rx.Component:
                 rx.cond(
                     ExamineState.editing_window_id == window.window_id,
                     rx.vstack(
-                        rx.text("Select labels:", size="2", weight="bold"),
-                        rx.box(
-                            rx.vstack(
-                                rx.foreach(
-                                    rx.Var.range(ExamineState.all_labels.length()),
-                                    lambda label_idx: rx.checkbox(
-                                        rx.text(
-                                            ExamineState.all_labels[label_idx], size="2"
-                                        ),
-                                        checked=ExamineState.edit_labels.contains(
-                                            ExamineState.all_labels[label_idx]
-                                        ),
-                                        on_change=ExamineState.toggle_edit_label_by_index(
-                                            label_idx
-                                        ),
-                                    ),
-                                ),
-                                spacing="1",
-                                width="100%",
-                            ),
-                            max_height="200px",
-                            overflow_y="auto",
-                            width="100%",
-                        ),
+                        label_multiselect(),
                         rx.hstack(
                             rx.button(
                                 "Save",
