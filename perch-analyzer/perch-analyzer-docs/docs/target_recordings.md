@@ -27,7 +27,9 @@ In addition to gathering target recordings from Xeno-canto, you can also import 
 To gather target recordings from Xeno-canto, you first need to obtain a Xeno-canto API key from https://xeno-canto.org/explore/api (they key is on your account page). To set your Xeno-canto API key, use the following command:
 
 ```bash
-TODO!
+perch-analyzer set_xc_api_key \
+    --data_dir=<data-directory> \
+    --xc_api_key=<your-xeno-canto-api-key>
 ```
 
 Then, you can use the following command to gather target recordings for a focal species:

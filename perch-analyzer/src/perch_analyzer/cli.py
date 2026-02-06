@@ -91,6 +91,13 @@ def main():
     run_classifier_parser.add_argument("--data_dir", type=Path, required=True)
     run_classifier_parser.add_argument("--classifier_id", type=int, required=True)
 
+    # Set Xeno-canto API key subcommand
+    set_xc_api_key_parser = subparsers.add_parser(
+        "set_xc_api_key", help="Set the Xeno-canto API key for the given project"
+    )
+    set_xc_api_key_parser.add_argument("--data_dir", type=Path, required=True)
+    set_xc_api_key_parser.add_argument("--xc_api_key", type=str, required=True)
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -212,6 +219,17 @@ def main():
             analyzer_db=analyzer_db,
         )
         print("done running classifier")
+    if args.module == "set_xc_api_key":
+        if not initialize_directory.check_initialized(args.data_dir):
+            raise ValueError(
+                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
+            )
+        conf = config.Config.load(args.data_dir)
+
+        conf.xenocanto_api_key = args.xc_api_key
+        conf.to_file()
+
+        print("successfully updated Xeno-canto API key")
 
 
 if __name__ == "__main__":
