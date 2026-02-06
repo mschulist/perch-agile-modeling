@@ -1,5 +1,4 @@
 import argparse
-from perch_analyzer.gui import home_page
 from perch_analyzer.config import initialize_directory, config
 from pathlib import Path
 from perch_analyzer.embed import embed
@@ -103,10 +102,7 @@ def main():
 
     # Route to appropriate section
     if args.module == "gui":
-        demo = home_page.home(args.data_dir)
-        demo.launch(
-            share=args.share, server_name=args.server_name, server_port=args.server_port
-        )
+        raise NotImplementedError("GUI is a work in progress!")
     elif args.module == "embed":
         if not initialize_directory.check_initialized(args.data_dir):
             raise ValueError(
