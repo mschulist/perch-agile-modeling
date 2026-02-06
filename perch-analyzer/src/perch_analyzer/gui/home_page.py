@@ -1,5 +1,10 @@
 import gradio as gr
-from perch_analyzer.gui import annotate_page, examine_page, summary_page
+from perch_analyzer.gui import (
+    annotate_page,
+    examine_page,
+    summary_page,
+    classifiers_page,
+)
 from pathlib import Path
 from perch_analyzer.config import config
 from perch_analyzer.db import db
@@ -28,6 +33,8 @@ def home(data_dir: Path):
         summary_page.summary(
             config=conf, analyzer_db=analyzer_db, hoplite_db=hoplite_db
         )
+    with homepage.route("Classifiers"):
+        classifiers_page.classifiers(analyzer_db)
     return homepage
 
 

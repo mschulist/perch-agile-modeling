@@ -10,6 +10,7 @@ const config: Config = {
   baseUrl: "/",
   onBrokenLinks: "warn",
   favicon: "/static/logo.png",
+  staticDirectories: ["public", "static"],
 
   future: {
     v4: true,

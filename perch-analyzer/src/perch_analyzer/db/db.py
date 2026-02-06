@@ -156,6 +156,47 @@ class AnalyzerDB:
             session.commit()
             return classifier_id
 
+    def get_all_classifiers(self):
+        with Session(self.engine) as session:
+            stmt = select(tables.Classifier)
+            db_classifiers = session.execute(stmt).scalars().all()
+
+            classifiers: list[Classifier] = []
+
+            for db_classifier in db_classifiers:
+                linear_classifier = classifier.LinearClassifier.load(
+                    linear_classifier_path(
+                        f"{self.config.data_path}/{self.config.classifiers_dir}",
+                        db_classifier.id,
+                    )
+                )
+
+                metrics = np.load(
+                    metrics_path(
+                        f"{self.config.data_path}/{self.config.classifiers_dir}",
+                        db_classifier.id,
+                    )
+                )
+
+                classifiers.append(
+                    Classifier(
+                        id=db_classifier.id,
+                        datetime=dt.fromisoformat(db_classifier.datetime),
+                        embedding_model=db_classifier.embedding_model,
+                        linear_classifier=linear_classifier,
+                        metrics=metrics,
+                        labels=tuple(db_classifier.labels),
+                        num_train_steps=db_classifier.num_train_steps,
+                        learning_rate=db_classifier.learning_rate,
+                        rng=db_classifier.rng,
+                        train_ratio=db_classifier.train_ratio,
+                        max_train_examples_per_label=db_classifier.max_train_examples_per_label,
+                        weak_neg_rate=db_classifier.weak_neg_rate,
+                    )
+                )
+
+            return classifiers
+
     def get_classifier_output(self, classifier_output_id: int) -> ClassifierOutput:
         with Session(self.engine) as session:
             stmt = select(tables.ClassifierOutput).where(

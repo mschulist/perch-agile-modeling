@@ -27,7 +27,9 @@ perch-analyzer create_classifier \
 - `weak_neg_rate` is the penalty in the loss function to classes not explicitly labeled in a window. The default of 0.05 is probably fine for most use cases. This is why it is important to label all species vocalizing in a given window.
 - `num_train_steps` is the number of epochs used during training. The default of 128 is perfectly fine.
 
-This generates a classifier, which you can run on your ARU data using the method shown below. Because we partition our data into train/test sets, we have metrics on the quality of our classifier. These metrics can be viewed using the `Classifiers` tab in the GUI (TODO, implement this!). 
+This generates a classifier, which you can run on your ARU data using the method shown below. Because we partition our data into train/test sets, we have metrics on the quality of our classifier. These metrics can be viewed using the `Classifiers` tab in the GUI. 
+
+![List of trained classifiers in the GUI](/classifiers_list_gui.png)
 
 ## Running a classifier
 
