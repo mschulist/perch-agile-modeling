@@ -1,13 +1,42 @@
+import sqlite3
 import dataclasses
 from perch_hoplite.db import sqlite_usearch_impl, interface
 import numpy as np
 from ml_collections import config_dict
 from tqdm import tqdm
 
-old_db = sqlite_usearch_impl.SQLiteUSearchDB.create("data/hoplite_old")
+old_db = sqlite_usearch_impl.SQLiteUSearchDB.create("data/hoplite")
 new_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
-    "data/hoplite", sqlite_usearch_impl.get_default_usearch_config(1536)
+    "data/hoplite_new", sqlite_usearch_impl.get_default_usearch_config(1536)
 )
+
+
+
+def migrate_table(conn: sqlite3.Connection, table: str):
+    cur = conn.cursor()
+    cur.execute(f"SELECT id, offsets FROM {table}")
+
+    for row_id, offsets in tqdm(cur.fetchall()):
+        # offsets is already a Python sequence of floats
+        data = np.asarray(offsets, dtype=np.float64).tobytes()
+        arr32 = np.frombuffer(data, dtype=np.float32)
+        arr64 = arr32.astype(np.float64)
+
+        # Write raw bytes directly
+        blob64 = arr64.tobytes()
+
+        cur.execute(
+            f"UPDATE {table} SET offsets = ? WHERE id = ?",
+            (sqlite3.Binary(blob64), row_id),
+        )
+
+    conn.commit()
+
+
+# migrate_table(new_db.db, "annotations")
+migrate_table(new_db.db, "windows")
+
+exit()
 
 # new_recordings = new_db.get_all_recordings()
 # old_recordings = old_db.get_all_recordings()
