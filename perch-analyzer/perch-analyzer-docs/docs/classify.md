@@ -13,7 +13,7 @@ To create a custom classifier, run the following command:
 ```bash
 perch-analyzer create_classifier \
     --data_dir=<data-directory> \
-    --throwaway_classes=<class-list> \
+    --throwaway_classes class1 class2 ... \
     --train_ratio=<training-ratio> \
     --learning_rate=<learning-rate> \
     --weak_neg_rate=<weak-negative-rate> \
