@@ -1,0 +1,32 @@
+[project]
+name = "perch-analyzer"
+version = "0.1.0"
+description = "Program to build bioacoustics classifiers"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gradio>=6.3.0",
+    "httpx>=0.28.1",
+    "jax>=0.9.0",
+    "perch-hoplite",
+    "polars>=1.37.1",
+    "pyarrow>=23.0.0",
+    "pydantic>=2.12.5",
+    "pytest>=9.0.2",
+    "pyyaml>=6.0.3",
+    "reflex>=0.8.26",
+    "sqlalchemy>=2.0.46",
+    "tensorflow>=2.20.0",
+    "tqdm>=4.67.1",
+]
+
+[tool.uv.sources]
+perch-hoplite = { git = "https://github.com/mschulist/perch-hoplite.git", rev = "44484c6e5ac9f3de3be443ae56e9de7ba52fca61" }
+
+[dependency-groups]
+dev = [
+    "py-spy>=0.4.1",
+]
+
+[project.scripts]
+perch-analyzer = "perch_analyzer.cli:main"
