@@ -6,11 +6,14 @@ import rehypeKatex from "rehype-katex";
 
 const config: Config = {
   title: "Perch Analyzer",
-  url: "https://your-docusaurus-site.example.com",
-  baseUrl: "/",
+  url: "https://mschulist.github.io",
+  baseUrl: "/perch-agile-modeling/",
   onBrokenLinks: "warn",
   favicon: "/static/logo.png",
   staticDirectories: ["public", "static"],
+  organizationName: "mschulist",
+  projectName: "perch-agile-modeling",
+  deploymentBranch: "gh-pages",
 
   future: {
     v4: true,
