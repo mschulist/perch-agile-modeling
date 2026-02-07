@@ -62,7 +62,7 @@ def main():
     )
     create_classifier_parser.add_argument("--data_dir", type=Path, required=True)
     create_classifier_parser.add_argument(
-        "--throwaway_classes", type=list[str], default=[]
+        "--throwaway_classes", nargs="*", type=str, default=[]
     )
     create_classifier_parser.add_argument("--train_ratio", type=float, default=0.8)
     create_classifier_parser.add_argument(
