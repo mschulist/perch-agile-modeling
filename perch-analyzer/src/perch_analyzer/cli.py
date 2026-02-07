@@ -10,6 +10,13 @@ from perch_analyzer.gui import gui_loader
 from perch_hoplite.db import sqlite_usearch_impl
 
 
+def check_init_and_raise_error(data_dir: Path):
+    if not initialize_directory.check_initialized(data_dir):
+        raise ValueError(
+            f"data directory {data_dir} is not initialized yet, run perch-analyzer init --data_dir={data_dir}"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Perch Analyzer - Bird call analysis toolkit"
@@ -91,16 +98,10 @@ def main():
 
     # Route to appropriate section
     if args.module == "gui":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         gui_loader.start_gui(str(args.data_dir))
     elif args.module == "embed":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         # update the config with the ARU path
         conf = config.Config.load(args.data_dir)
 
@@ -125,10 +126,7 @@ def main():
         )
         print(f"Successfully initialized directory {args.data_dir}!")
     elif args.module == "target_recordings":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         conf = config.Config.load(args.data_dir)
         analyzer_db = db.AnalyzerDB(conf)
 
@@ -144,10 +142,7 @@ def main():
 
         print("finished adding recordings!")
     if args.module == "search":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         conf = config.Config.load(args.data_dir)
         analyzer_db = db.AnalyzerDB(conf)
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
@@ -166,10 +161,7 @@ def main():
         print("finished searching recordings!")
 
     if args.module == "create_classifier":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         conf = config.Config.load(args.data_dir)
         analyzer_db = db.AnalyzerDB(conf)
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
@@ -191,10 +183,7 @@ def main():
 
         print("done making classifier!")
     if args.module == "run_classifier":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         conf = config.Config.load(args.data_dir)
         analyzer_db = db.AnalyzerDB(conf)
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
@@ -209,10 +198,7 @@ def main():
         )
         print("done running classifier")
     if args.module == "set_xc_api_key":
-        if not initialize_directory.check_initialized(args.data_dir):
-            raise ValueError(
-                f"data directory {args.data_dir} is not initialized yet, run perch-analyzer init --data_dir={args.data_dir}"
-            )
+        check_init_and_raise_error(args.data_dir)
         conf = config.Config.load(args.data_dir)
 
         conf.xenocanto_api_key = args.xc_api_key
