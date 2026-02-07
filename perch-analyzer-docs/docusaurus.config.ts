@@ -9,7 +9,7 @@ const config: Config = {
   url: "https://mschulist.github.io",
   baseUrl: "/perch-agile-modeling/",
   onBrokenLinks: "warn",
-  favicon: "/static/logo.png",
+  favicon: "/logo.png",
   staticDirectories: ["public", "static"],
   organizationName: "mschulist",
   projectName: "perch-agile-modeling",
