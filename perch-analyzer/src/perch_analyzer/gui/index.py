@@ -22,7 +22,7 @@ def navbar() -> rx.Component:
             navbar_link("Annotate", "/annotate"),
             navbar_link("Examine", "/examine"),
             navbar_link("Classifiers", "/classifiers"),
-            navbar_link("Summary", "/summary"),
+            navbar_link("Audio Summary", "/summary"),
             navbar_link("Configuration", "/config"),
             spacing="4",
         ),
