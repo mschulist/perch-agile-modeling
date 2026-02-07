@@ -31,6 +31,7 @@ def train_classifier(
         min_eval_examples=1,
         train_ratio=train_ratio,
         rng=np.random.default_rng(RNG),
+        max_train_examples_per_label=max_train_examples_per_label,
     )
 
     linear_classifier, metrics = classifier.train_linear_classifier(
