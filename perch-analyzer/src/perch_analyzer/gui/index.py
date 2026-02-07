@@ -7,6 +7,7 @@ from perch_analyzer.gui import (
     classifiers_page,
     examine_page,
     annotate_page,
+    config_page,
 )
 
 
@@ -22,6 +23,7 @@ def navbar() -> rx.Component:
             navbar_link("Examine", "/examine"),
             navbar_link("Classifiers", "/classifiers"),
             navbar_link("Summary", "/summary"),
+            navbar_link("Configuration", "/config"),
             spacing="4",
         ),
         padding="2em",
@@ -44,6 +46,7 @@ app.add_page(lambda: with_navbar(annotate_page.annotate()), route="/annotate")
 app.add_page(lambda: with_navbar(examine_page.examine()), route="/examine")
 app.add_page(lambda: with_navbar(classifiers_page.classifiers()), route="/classifiers")
 app.add_page(lambda: with_navbar(summary_page.summary()), route="/summary")
+app.add_page(lambda: with_navbar(config_page.config_page()), route="/config")
 
 # Mount the data directory as static files
 # Get data path from environment variable, fallback to "data" for backwards compatibility

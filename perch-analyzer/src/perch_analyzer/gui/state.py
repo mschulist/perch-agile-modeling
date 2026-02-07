@@ -20,6 +20,23 @@ class ConfigState(rx.State):
     # Serializable config
     config: Config = _config
 
+    # Editable fields
+    edit_user_name: str = _config.user_name
+    edit_project_name: str = _config.project_name
+    edit_xenocanto_api_key: str = _config.xenocanto_api_key
+
+    @rx.event
+    def set_edit_user_name(self, value: str):
+        self.edit_user_name = value
+
+    @rx.event
+    def set_edit_project_name(self, value: str):
+        self.edit_project_name = value
+
+    @rx.event
+    def set_edit_xenocanto_api_key(self, value: str):
+        self.edit_xenocanto_api_key = value
+
     # Class-level database connections (shared across all instances)
     @classmethod
     def get_hoplite_db(cls) -> sqlite_usearch_impl.SQLiteUSearchDB:
@@ -34,6 +51,17 @@ class ConfigState(rx.State):
         if not hasattr(cls, "_analyzer_db_instance"):
             cls._analyzer_db_instance = db.AnalyzerDB(_config)
         return cls._analyzer_db_instance
+
+    @rx.event
+    def save_config_changes(self):
+        """Save the editable config fields to disk."""
+        self.config.user_name = self.edit_user_name
+        self.config.project_name = self.edit_project_name
+        self.config.xenocanto_api_key = self.edit_xenocanto_api_key
+        self.config.to_file()
+        # Update global config
+        global _config
+        _config = self.config
 
 
 # type: ignore
