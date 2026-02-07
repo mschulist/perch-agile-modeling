@@ -57,6 +57,9 @@ const config: Config = {
     },
     navbar: {
       title: "Perch Analyzer",
+      logo: {
+        src: "/logo.png",
+      },
       items: [
         {
           href: "https://github.com/mschulist/perch-agile-modeling",
