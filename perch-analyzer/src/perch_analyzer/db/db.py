@@ -226,6 +226,30 @@ class AnalyzerDB:
 
             return db_classifier_output.id
 
+    def get_all_classifier_outputs(self, classifier_id: int) -> list[ClassifierOutput]:
+        with Session(self.engine) as session:
+            stmt = select(tables.ClassifierOutput).where(
+                tables.ClassifierOutput.classifier_id == classifier_id
+            )
+
+            db_classifier_outputs = session.execute(stmt).scalars().all()
+
+            classifier_outputs: list[ClassifierOutput] = []
+
+            for db_classifier_output in db_classifier_outputs:
+                classifier_outputs.append(
+                    ClassifierOutput(
+                        id=db_classifier_output.id,
+                        classifier_id=db_classifier_output.classifier_id,
+                        parquet_path=classifier_output_path(
+                            f"{self.config.data_path}/{self.config.classifier_outputs_dir}",
+                            db_classifier_output.id,
+                        ),
+                    )
+                )
+
+            return classifier_outputs
+
     def get_target_recording(self, target_recording_id: int) -> TargetRecording:
         with Session(self.engine) as session:
             stmt = select(tables.TargetRecording).where(

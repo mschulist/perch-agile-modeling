@@ -9,6 +9,7 @@ from perch_analyzer.gui import (
     annotate_page,
     config_page,
     single_classifier_page,
+    classifier_output_page,
 )
 
 
@@ -51,6 +52,10 @@ app.add_page(lambda: with_navbar(config_page.config_page()), route="/config")
 app.add_page(
     lambda: with_navbar(single_classifier_page.single_classifier_page()),
     route="/single_classifier/[id]",
+)
+app.add_page(
+    lambda: with_navbar(classifier_output_page.classifier_output_page()),
+    route="/classifier_output/[id]",
 )
 
 # Mount the data directory as static files

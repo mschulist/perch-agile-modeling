@@ -2,7 +2,6 @@ import sqlite3
 import dataclasses
 from perch_hoplite.db import sqlite_usearch_impl, interface
 import numpy as np
-from ml_collections import config_dict
 from tqdm import tqdm
 
 old_db = sqlite_usearch_impl.SQLiteUSearchDB.create("data/hoplite")

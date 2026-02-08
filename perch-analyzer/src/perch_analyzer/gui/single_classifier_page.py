@@ -60,6 +60,22 @@ def classifier_card() -> rx.Component:
     )
 
 
+def classifier_output_card(classifier_output_id: int) -> rx.Component:
+    return rx.box(
+        rx.heading(f"Classifier Output Id: {classifier_output_id}"),
+        border="1px solid #e0e0e0",
+        border_radius="8px",
+        padding="0.5em",
+        margin_top="1em",
+        on_click=rx.redirect(f"/classifier_output/{classifier_output_id}"),
+        cursor="pointer",
+        transition="background-color 0.3s ease",
+        _hover={
+            "background_color": "#444444",
+        },
+    )
+
+
 class SingleClassifierState(ConfigState):
     @rx.var
     def classifier_id(self) -> str:
@@ -74,8 +90,7 @@ class SingleClassifierState(ConfigState):
         analyzer_db = ConfigState.get_analyzer_db()
         try:
             return analyzer_db.get_classifier(int(self.classifier_id))
-        except Exception as e:
-            print(f"Error loading classifier: {e}")
+        except Exception as _:
             return None
 
     @rx.var
@@ -159,6 +174,14 @@ class SingleClassifierState(ConfigState):
             return NA_STR
         return str(clf.labels)
 
+    @rx.var
+    def classifier_outputs(self) -> list[db.ClassifierOutput]:
+        clf = self._get_classifier()
+        if not clf:
+            return []
+        analyzer_db = ConfigState.get_analyzer_db()
+        return analyzer_db.get_all_classifier_outputs(clf.id)
+
 
 def single_classifier_page():
     return rx.container(
@@ -180,7 +203,12 @@ def single_classifier_page():
                 ),
                 classifier_card(),
             ),
-        )
+        ),
+        rx.divider(orientation="horizontal", margin_top="1em", margin_bottom="1em"),
+        rx.heading("Classifier Outputs", size="8"),
+        SingleClassifierState.classifier_outputs.foreach(
+            lambda classifier_output: classifier_output_card(classifier_output.id)
+        ),
     )
 
 
