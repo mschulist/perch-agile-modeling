@@ -8,6 +8,7 @@ from perch_analyzer.gui import (
     examine_page,
     annotate_page,
     config_page,
+    single_classifier_page,
 )
 
 
@@ -47,6 +48,10 @@ app.add_page(lambda: with_navbar(examine_page.examine()), route="/examine")
 app.add_page(lambda: with_navbar(classifiers_page.classifiers()), route="/classifiers")
 app.add_page(lambda: with_navbar(summary_page.summary()), route="/summary")
 app.add_page(lambda: with_navbar(config_page.config_page()), route="/config")
+app.add_page(
+    lambda: with_navbar(single_classifier_page.single_classifier_page()),
+    route="/single_classifier/[id]",
+)
 
 # Mount the data directory as static files
 # Get data path from environment variable, fallback to "data" for backwards compatibility

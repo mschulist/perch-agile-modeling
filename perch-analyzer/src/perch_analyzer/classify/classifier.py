@@ -41,11 +41,10 @@ def train_classifier(
         num_train_steps=num_train_steps,
     )
 
-    # TODO: get the correct embedding model
     return analyzer_db.insert_classifier(
         datetime=dt.now(),
         embedding_model=config.embedding_model,
-        labels=target_labels,
+        labels=list(target_labels),
         train_ratio=train_ratio,
         max_train_examples_per_label=max_train_examples_per_label,
         learning_rate=learning_rate,

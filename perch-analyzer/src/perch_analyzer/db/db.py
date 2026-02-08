@@ -36,7 +36,7 @@ class Classifier(BaseModel):
     id: int
     datetime: dt
     embedding_model: str
-    labels: tuple[str, ...]
+    labels: list[str]
     train_ratio: float
     rng: int | None
     max_train_examples_per_label: int
@@ -97,7 +97,7 @@ class AnalyzerDB:
                 embedding_model=db_classifier.embedding_model,
                 linear_classifier=linear_classifier,
                 metrics=metrics,
-                labels=tuple(db_classifier.labels),
+                labels=list(db_classifier.labels),
                 num_train_steps=db_classifier.num_train_steps,
                 learning_rate=db_classifier.learning_rate,
                 rng=db_classifier.rng,
@@ -110,7 +110,7 @@ class AnalyzerDB:
         self,
         datetime: dt,
         embedding_model: str,
-        labels: tuple[str, ...],
+        labels: list[str],
         train_ratio: float,
         rng: int | None,
         max_train_examples_per_label: int,
@@ -185,7 +185,7 @@ class AnalyzerDB:
                         embedding_model=db_classifier.embedding_model,
                         linear_classifier=linear_classifier,
                         metrics=metrics,
-                        labels=tuple(db_classifier.labels),
+                        labels=db_classifier.labels,
                         num_train_steps=db_classifier.num_train_steps,
                         learning_rate=db_classifier.learning_rate,
                         rng=db_classifier.rng,
