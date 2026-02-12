@@ -60,6 +60,19 @@ class ClassifierOutputState(rx.State):
         self.selected_label = label
 
     @rx.var
+    def row_count(self) -> int | None:
+        """Get the number of rows in the classifier output"""
+        classifier_output = self._get_classifier_output()
+        if not classifier_output:
+            return None
+        try:
+            lazy_df = pl.scan_parquet(classifier_output.parquet_path)
+            return lazy_df.select(pl.len()).collect().item()
+        except Exception as e:
+            print(f"failed to get row count: {e}")
+            return None
+
+    @rx.var
     def logits_plot(self) -> plt.Figure | None:
         """Generate a plot of logits for the selected label."""
         if not self.selected_label:
@@ -98,6 +111,7 @@ def classifier_output_page():
         rx.heading(
             f"Classifier Output Id: {ClassifierOutputState.classifier_output_id}"
         ),
+        rx.heading(f"Number of rows: {ClassifierOutputState.row_count}"),
         rx.vstack(
             rx.hstack(
                 rx.heading("Select a Label", size="5"),
@@ -115,7 +129,7 @@ def classifier_output_page():
                     rx.heading(
                         f"Logits for: {ClassifierOutputState.selected_label}", size="4"
                     ),
-                    pyplot(ClassifierOutputState.logits_plot),
+                    pyplot(ClassifierOutputState.logits_plot),  # type: ignore
                     spacing="4",
                 ),
                 rx.text("Select a label to view the logit distribution"),
