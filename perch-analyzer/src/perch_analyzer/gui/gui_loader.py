@@ -21,6 +21,8 @@ config = rx.Config(
     app_module_import="perch_analyzer.gui.index",
     backend_port=8000,
     frontend_port=3000,
+    backend_host="0.0.0.0",
+    frontend_host="0.0.0.0",
     plugins=[rx.plugins.sitemap.SitemapPlugin()],
 )
 """
