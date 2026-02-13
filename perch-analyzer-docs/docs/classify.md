@@ -43,3 +43,32 @@ perch-analyzer run_classifier \
 
 - `data_dir` is the directory used to [setup](setup) a project.
 - `classifier_id` is the id of the classifier, which can be found in the `Classifiers` tab in the GUI. 
+
+## Reviewing classifier outputs
+
+In the `Classifiers` window, you can click on the classifier to see all of the associated classifier runs (classifier outputs). 
+
+![](/classifier_runs.png)
+
+Then, you can click on a classifier output to review the actual windows and corresponding logits. To get samples from a classifer output, use the following command:
+
+```bash
+perch-analyzer gather_classifier_outputs \
+    --data_dir <data-directory> \
+    --label <label-to-investigate> \
+    --min_logit <min-logit> \
+    --max_logit <max_logit> \
+    --classifier_output_id <classifier-output-id> \
+    --num_windows <number-of-windows>
+```
+
+- `data_dir` is the directory used to [setup](setup) a project. 
+- `label` is the label you want to get classifier outputs for.
+- `min_logit` is the minimum logit you want to filter the classifier outputs by. 
+- `max_logit` is the maximum logit you want to filter the classifier outputs by.
+- `classifier_output_id` is the id of the classifier output, which can be found by clicking on a classifier in the `Classifiers` tab in the GUI.
+- `num_windows` is the maximum number of windows to sample. Defaults to 1.
+
+This command samples windows from the classifier output within the specified logit range, allowing you to review and validate the classifier's predictions for a particular label. After gathering classifier outputs, they will appear in the GUI under the corresponding classifier outputs page. 
+
+![](/classifier_outputs.png)
