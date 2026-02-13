@@ -30,6 +30,18 @@ class ClassifierOutput(Base):
     classifier_id: Mapped[int] = mapped_column(ForeignKey("classifiers.id"))
 
 
+class ClassifierOutputWindow(Base):
+    __tablename__ = "classifier_output_windows"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    classifier_output_id: Mapped[int] = mapped_column(
+        ForeignKey("classifier_outputs.id")
+    )
+    window_id: Mapped[int] = mapped_column(nullable=False, unique=False)
+    logit: Mapped[int] = mapped_column(nullable=False, unique=False)
+    label: Mapped[str] = mapped_column(nullable=False, unique=False)
+
+
 class TargetRecording(Base):
     __tablename__ = "target_recordings"
 

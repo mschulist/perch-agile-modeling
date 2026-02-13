@@ -5,7 +5,7 @@ from perch_analyzer.embed import embed
 from perch_analyzer.target_recordings import target_recordings
 from perch_analyzer.db import db
 from perch_analyzer.search import search
-from perch_analyzer.classify import classifier, classify
+from perch_analyzer.classify import classifier, classify, classifier_outputs
 from perch_analyzer.gui import gui_loader
 from perch_hoplite.db import sqlite_usearch_impl
 
@@ -92,6 +92,26 @@ def main():
     )
     set_xc_api_key_parser.add_argument("--data_dir", type=Path, required=True)
     set_xc_api_key_parser.add_argument("--xc_api_key", type=str, required=True)
+
+    # Gather classifier outputs subcommand
+    gather_classifier_outputs_parser = subparsers.add_parser(
+        "gather_classifier_outputs",
+        help="Gather outputs from classifier outputs for a particular label and logit range",
+    )
+    gather_classifier_outputs_parser.add_argument(
+        "--data_dir", type=Path, required=True
+    )
+    gather_classifier_outputs_parser.add_argument(
+        "--classifier_output_id", type=int, required=True
+    )
+    gather_classifier_outputs_parser.add_argument(
+        "--min_logit", type=float, required=True
+    )
+    gather_classifier_outputs_parser.add_argument(
+        "--max_logit", type=float, required=True
+    )
+    gather_classifier_outputs_parser.add_argument("--label", type=str, required=True)
+    gather_classifier_outputs_parser.add_argument("--num_windows", type=int, default=1)
 
     # Parse arguments
     args = parser.parse_args()
@@ -205,6 +225,20 @@ def main():
         conf.to_file()
 
         print("successfully updated Xeno-canto API key")
+    if args.module == "gather_classifier_outputs":
+        check_init_and_raise_error(args.data_dir)
+        conf = config.Config.load(args.data_dir)
+        analyzer_db = db.AnalyzerDB(conf)
+        classifier_outputs.gather_classifier_output_windows(
+            analyzer_db=analyzer_db,
+            classifier_output_id=args.classifier_output_id,
+            min_logit=args.min_logit,
+            max_logit=args.max_logit,
+            label=args.label,
+            num_windows=args.num_windows,
+        )
+
+        print("successfully gathered target recordings")
 
 
 if __name__ == "__main__":

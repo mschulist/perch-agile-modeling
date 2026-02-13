@@ -30,6 +30,16 @@ def get_target_recording_path(target_recordings_dir: str, target_recording_id: i
     return f"{target_recordings_dir}/{target_recording_id}.wav"
 
 
+class ClassifierOutputWindow(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: int
+    classifier_output_id: int
+    window_id: int
+    label: str
+    logit: float
+
+
 class Classifier(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -358,3 +368,70 @@ class AnalyzerDB:
             session.commit()
 
             return db_target_recording.id
+
+    def insert_classifier_output_window(
+        self, classifier_output_id: int, window_id: int, logit: float, label: str
+    ):
+        with Session(self.engine) as session:
+            db_classifier_output_window = tables.ClassifierOutputWindow(
+                classifier_output_id=classifier_output_id,
+                window_id=window_id,
+                logit=logit,
+                label=label,
+            )
+
+            session.add(db_classifier_output_window)
+            session.flush()
+            session.commit()
+
+            return db_classifier_output_window.id
+
+    def get_classifier_output_window(self, classifier_output_window_id: int):
+        with Session(self.engine) as session:
+            stmt = select(tables.ClassifierOutputWindow).where(
+                tables.ClassifierOutputWindow.id == classifier_output_window_id
+            )
+
+            db_classifier_output_window = session.execute(stmt).scalar_one()
+
+            return ClassifierOutputWindow(
+                id=db_classifier_output_window.id,
+                classifier_output_id=db_classifier_output_window.classifier_output_id,
+                window_id=db_classifier_output_window.window_id,
+                label=db_classifier_output_window.label,
+                logit=db_classifier_output_window.logit,
+            )
+
+    def get_all_classifier_output_windows(
+        self,
+        classifier_output_id: int,
+        window_id: int | None = None,
+        label: str | None = None,
+    ):
+        with Session(self.engine) as session:
+            stmt = select(tables.ClassifierOutputWindow).where(
+                tables.ClassifierOutputWindow.classifier_output_id
+                == classifier_output_id
+            )
+
+            if window_id is not None:
+                stmt = stmt.where(tables.ClassifierOutputWindow.window_id == window_id)
+            if label is not None:
+                stmt = stmt.where(tables.ClassifierOutputWindow.label == label)
+
+            db_classifier_output_windows = session.execute(stmt).scalars().all()
+
+            classifier_output_windows: list[ClassifierOutputWindow] = []
+
+            for db_classifier_output_window in db_classifier_output_windows:
+                classifier_output_windows.append(
+                    ClassifierOutputWindow(
+                        id=db_classifier_output_window.id,
+                        window_id=db_classifier_output_window.window_id,
+                        label=db_classifier_output_window.label,
+                        logit=db_classifier_output_window.logit,
+                        classifier_output_id=db_classifier_output_window.classifier_output_id,
+                    )
+                )
+
+            return classifier_output_windows
