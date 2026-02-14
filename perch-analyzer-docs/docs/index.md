@@ -10,6 +10,10 @@ Welcome to the Perch Analyzer documentation.
 
 Perch Analyzer is a tool for analyzing bird sounds using machine learning. We use _agile learning_[^1] to build a high quality bird vocalization classifier, mixing CLI and visual components to aid in this process.
 
+![](/graphic.svg)
+
+This diagram shows the agile modeling workflow. 
+
 
 ## Installation
 
