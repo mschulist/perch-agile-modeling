@@ -167,14 +167,14 @@ class SingleClassifierState(ConfigState):
             return NA_STR
         return str(clf.num_train_steps)
 
-    @rx.var
+    @rx.var(cache=False)
     def labels(self) -> str:
         clf = self._get_classifier()
         if not clf:
             return NA_STR
         return str(clf.labels)
 
-    @rx.var
+    @rx.var(cache=False)
     def classifier_outputs(self) -> list[db.ClassifierOutput]:
         clf = self._get_classifier()
         if not clf:
