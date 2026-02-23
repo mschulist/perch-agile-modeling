@@ -2969,7 +2969,7 @@ requires-dist = [
     { name = "gradio", specifier = ">=6.3.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jax", specifier = ">=0.9.0" },
-    { name = "perch-hoplite", git = "https://github.com/mschulist/perch-hoplite.git?rev=44484c6e5ac9f3de3be443ae56e9de7ba52fca61" },
+    { name = "perch-hoplite", git = "https://github.com/mschulist/perch-hoplite.git?rev=c62cb43f8bf564314371f7781854827f715f4a18" },
     { name = "polars", specifier = ">=1.37.1" },
     { name = "pyarrow", specifier = ">=23.0.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
@@ -2988,7 +2988,7 @@ dev = [{ name = "py-spy", specifier = ">=0.4.1" }]
 [[package]]
 name = "perch-hoplite"
 version = "1.0.0"
-source = { git = "https://github.com/mschulist/perch-hoplite.git?rev=44484c6e5ac9f3de3be443ae56e9de7ba52fca61#44484c6e5ac9f3de3be443ae56e9de7ba52fca61" }
+source = { git = "https://github.com/mschulist/perch-hoplite.git?rev=c62cb43f8bf564314371f7781854827f715f4a18#c62cb43f8bf564314371f7781854827f715f4a18" }
 dependencies = [
     { name = "absl-py" },
     { name = "etils", extra = ["epath"] },
