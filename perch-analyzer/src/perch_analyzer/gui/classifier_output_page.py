@@ -8,6 +8,9 @@ from perch_hoplite.db import interface
 from pathlib import Path
 import os
 from ml_collections import config_dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -55,7 +58,7 @@ class ClassifierOutputState(ConfigState):
         try:
             return analyzer_db.get_classifier_output(int(self.classifier_output_id))
         except Exception as e:
-            print(f"Error loading classifier output: {e}")
+            logger.error(f"Error loading classifier output: {e}")
             return None
 
     def _get_classifier(self) -> db.Classifier | None:
@@ -139,7 +142,7 @@ class ClassifierOutputState(ConfigState):
                 )
                 classifier_labels = {cow.label for cow in classifier_output_windows}
             except Exception as e:
-                print(f"Error loading classifier labels: {e}")
+                logger.error(f"Error loading classifier labels: {e}")
 
         # Combine both label sets
         all_labels_set = hoplite_labels | classifier_labels
@@ -238,7 +241,7 @@ class ClassifierOutputState(ConfigState):
             self.all_windows = windows_with_metadata
             self.windows = []  # Start with no windows displayed until label is selected
         except Exception as e:
-            print(f"Error loading classifier output windows: {e}")
+            logger.error(f"Error loading classifier output windows: {e}")
             self.all_windows = []
             self.windows = []
 

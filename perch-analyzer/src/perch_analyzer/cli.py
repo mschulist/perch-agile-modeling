@@ -8,6 +8,16 @@ from perch_analyzer.search import search
 from perch_analyzer.classify import classifier, classify, classifier_outputs
 from perch_analyzer.gui import gui_loader
 from perch_hoplite.db import sqlite_usearch_impl
+import logging
+
+
+def setup_logging(data_dir: Path):
+    log_path = data_dir / "perch_analyzer.log"
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        handlers=[logging.FileHandler(log_path)],
+    )
 
 
 def check_init_and_raise_error(data_dir: Path):
@@ -15,6 +25,7 @@ def check_init_and_raise_error(data_dir: Path):
         raise ValueError(
             f"data directory {data_dir} is not initialized yet, run perch-analyzer init --data_dir={data_dir}"
         )
+    setup_logging(data_dir)
 
 
 def main():
@@ -129,6 +140,9 @@ def main():
             str(Path(conf.data_path) / conf.hoplite_db_path)
         )
 
+        logger = logging.getLogger(__name__)
+
+        logger.info("embedding audio...this may take a while")
         print("embedding audio...this may take a while")
         embed.embed_audio(
             config=conf,
@@ -136,6 +150,7 @@ def main():
             ARU_base_path=args.ARU_base_path,
             ARU_file_glob=args.ARU_file_glob,
         )
+        logger.info("done embedding audio!")
         print("done embedding audio!")
     elif args.module == "init":
         initialize_directory.initialize_directory(
@@ -144,12 +159,16 @@ def main():
             user_name=args.user_name,
             embedding_model=args.embedding_model,
         )
+        logger = logging.getLogger(__name__)
+        logger.info(f"Successfully initialized directory {args.data_dir}!")
         print(f"Successfully initialized directory {args.data_dir}!")
     elif args.module == "target_recordings":
         check_init_and_raise_error(args.data_dir)
         conf = config.Config.load(args.data_dir)
         analyzer_db = db.AnalyzerDB(conf)
+        logger = logging.getLogger(__name__)
 
+        logger.info("adding recordings from xenocanto")
         print("adding recordings from xenocanto")
 
         target_recordings.add_target_recording_from_xc(
@@ -160,6 +179,7 @@ def main():
             num_recordings=args.num_recordings,
         )
 
+        logger.info("finished adding recordings!")
         print("finished adding recordings!")
     if args.module == "search":
         check_init_and_raise_error(args.data_dir)
@@ -168,7 +188,8 @@ def main():
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
             str(Path(conf.data_path) / conf.hoplite_db_path)
         )
-
+        logger = logging.getLogger(__name__)
+        logger.info("searching recordings")
         print("searching recordings")
 
         search.search_using_target_recordings(
@@ -178,6 +199,7 @@ def main():
             num_per_target_recording=args.num_per_target_recording,
         )
 
+        logger.info("finished searching recordings!")
         print("finished searching recordings!")
 
     if args.module == "create_classifier":
@@ -187,7 +209,8 @@ def main():
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
             str(Path(conf.data_path) / conf.hoplite_db_path)
         )
-
+        logger = logging.getLogger(__name__)
+        logger.info("making custom classifier")
         print("making custom classifier")
         classifier.train_classifier(
             config=conf,
@@ -201,6 +224,7 @@ def main():
             num_train_steps=args.num_train_steps,
         )
 
+        logger.info("done making classifier!")
         print("done making classifier!")
     if args.module == "run_classifier":
         check_init_and_raise_error(args.data_dir)
@@ -209,13 +233,16 @@ def main():
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
             str(Path(conf.data_path) / conf.hoplite_db_path)
         )
+        logger = logging.getLogger(__name__)
 
+        logger.info("running classifier!")
         print("running classifier!")
         classify.classify(
             classifier_id=args.classifier_id,
             hoplite_db=hoplite_db,
             analyzer_db=analyzer_db,
         )
+        logger.info("done running classifier")
         print("done running classifier")
     if args.module == "set_xc_api_key":
         check_init_and_raise_error(args.data_dir)
@@ -223,7 +250,9 @@ def main():
 
         conf.xenocanto_api_key = args.xc_api_key
         conf.to_file()
+        logger = logging.getLogger(__name__)
 
+        logger.info("successfully updated Xeno-canto API key")
         print("successfully updated Xeno-canto API key")
     if args.module == "gather_classifier_outputs":
         check_init_and_raise_error(args.data_dir)
@@ -237,7 +266,9 @@ def main():
             label=args.label,
             num_windows=args.num_windows,
         )
+        logger = logging.getLogger(__name__)
 
+        logger.info("successfully gathered target recordings")
         print("successfully gathered target recordings")
 
 
