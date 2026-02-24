@@ -38,7 +38,7 @@ class AnnotateState(ConfigState):
 
         # Get all POSSIBLE annotations
         annotations = hoplite_db.get_all_annotations(
-            config_dict.create(eq=dict(label_type=interface.LabelType.POSSIBLE))
+            config_dict.create(eq=dict(label_type=interface.LabelType.UNCERTAIN))
         )
 
         # Check if there are no more windows
@@ -74,7 +74,7 @@ class AnnotateState(ConfigState):
         backend_port = os.getenv("BACKEND_PORT", "8000")
         backend_url = f"http://{backend_host}:{backend_port}"
 
-        # Compute paths using /data prefix, which is what the backend uses to fetch 
+        # Compute paths using /data prefix, which is what the backend uses to fetch
         # data from the data_dir (for spectrograms and audio)
         data_path = Path(self.config.data_path)
         spec_relative = "/data/" + str(spec_file.relative_to(data_path))
@@ -147,7 +147,7 @@ class AnnotateState(ConfigState):
 
         # Get the POSSIBLE annotation to remove
         annotations = hoplite_db.get_all_annotations(
-            config_dict.create(eq=dict(label_type=interface.LabelType.POSSIBLE))
+            config_dict.create(eq=dict(label_type=interface.LabelType.UNCERTAIN))
         )
 
         if annotations:

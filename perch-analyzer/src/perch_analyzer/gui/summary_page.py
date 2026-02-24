@@ -90,7 +90,7 @@ def summary():
     unfinished_target_recordings_count = analyzer_db.count_target_recordings(False)
     annotations_to_be_labeled = len(
         hoplite_db.get_all_annotations(
-            filter=config_dict.create(eq=dict(label_type=interface.LabelType.POSSIBLE))
+            filter=config_dict.create(eq=dict(label_type=interface.LabelType.UNCERTAIN))
         )
     )
 

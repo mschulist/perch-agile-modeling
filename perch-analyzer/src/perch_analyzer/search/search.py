@@ -33,7 +33,7 @@ def search_using_target_recordings(
                 offsets=window.offsets,
                 label=target_recording.label,
                 provenance=SEARCH_PROVENANCE,
-                label_type=interface.LabelType.POSSIBLE,
+                label_type=interface.LabelType.UNCERTAIN,
             )
         db.set_finish_target_recording(target_recording.id, True)
 
