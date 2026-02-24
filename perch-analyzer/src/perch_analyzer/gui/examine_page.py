@@ -6,6 +6,10 @@ import os
 from perch_analyzer.gui.state import ConfigState
 from perch_analyzer.examine import examine_annotations, audio_windows
 from perch_hoplite.db import interface
+import logging
+from datetime import datetime as dt
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -112,8 +116,11 @@ class ExamineState(ConfigState):
     def load_recordings_for_label(self, label: str):
         """Load all recordings with the selected label."""
         hoplite_db = self.get_hoplite_db().thread_split()
+        before = dt.now()
         windows = examine_annotations.get_windows_by_label(hoplite_db, label)
+        logger.info(f"took {dt.now() - before} to get all windows by label {label}")
 
+        before = dt.now()
         windows_with_metadata: list[WindowWithMetadata] = []
         for window_with_annotations in windows:
             recording_file, spec_file = audio_windows.get_audio_window_path(
@@ -130,7 +137,7 @@ class ExamineState(ConfigState):
             backend_port = os.getenv("BACKEND_PORT", "8000")
             backend_url = f"http://{backend_host}:{backend_port}"
 
-            # Compute paths using /data prefix, which is what the backend uses to fetch 
+            # Compute paths using /data prefix, which is what the backend uses to fetch
             # data from the data_dir (for spectrograms and audio)
             data_path = Path(self.config.data_path)
             spec_relative = "/data/" + str(spec_file.relative_to(data_path))
@@ -149,6 +156,7 @@ class ExamineState(ConfigState):
                     audio_file=audio_url,
                 )
             )
+        logger.info(f"took {dt.now() - before} to get get all window paths {label}")
 
         self.windows = windows_with_metadata
 
@@ -400,14 +408,14 @@ def window_card(window: WindowWithMetadata, index: int) -> rx.Component:
                                 variant="solid",
                                 size="2",
                                 disabled=ExamineState.edit_labels.length() == 0,
-                                cursor="pointer"
+                                cursor="pointer",
                             ),
                             rx.button(
                                 "Cancel",
                                 on_click=ExamineState.cancel_editing,
                                 variant="outline",
                                 size="2",
-                                cursor="pointer"
+                                cursor="pointer",
                             ),
                             spacing="2",
                         ),

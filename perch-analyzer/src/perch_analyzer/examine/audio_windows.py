@@ -8,6 +8,9 @@ from librosa import display as librosa_display
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_audio_window_path(
@@ -52,6 +55,7 @@ def flush_window_to_disk(
     recording_file: str | Path,
     spec_file: str | Path,
 ):
+    logger.info(f"flushing window id: {window.id} to disk")
     audio_slice = audio_io.load_audio_window_soundfile(
         f"{base_path}/{recording.filename}",
         offset_s=window.offsets[0],

@@ -14,7 +14,7 @@ import logging
 def setup_logging(data_dir: Path):
     log_path = data_dir / "perch_analyzer.log"
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
         handlers=[logging.FileHandler(log_path)],
     )

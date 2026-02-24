@@ -1,5 +1,6 @@
 import reflex as rx
 import os
+import logging
 from pathlib import Path
 from starlette.staticfiles import StaticFiles
 from perch_analyzer.gui import (
@@ -11,6 +12,17 @@ from perch_analyzer.gui import (
     single_classifier_page,
     classifier_output_page,
 )
+
+# Configure logging for GUI pages
+data_dir = Path(os.environ.get("PERCH_ANALYZER_DATA_DIR", "data")).absolute()
+log_path = data_dir / "perch_analyzer.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[logging.FileHandler(log_path)],
+)
+logger = logging.getLogger(__name__)
+logger.info(f"GUI logging initialized, writing to: {log_path}")
 
 
 def navbar_link(text: str, url: str) -> rx.Component:
