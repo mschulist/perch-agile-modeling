@@ -1,3 +1,4 @@
+import logging
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 from perch_hoplite.agile.classifier import batched_embedding_iterator
 from perch_analyzer.db.db import AnalyzerDB
@@ -19,6 +20,10 @@ def classify(
     classifier = analyzer_db.get_classifier(classifier_id)
     classifier_output_id = analyzer_db.insert_classifier_output(classifier_id)
     classifier_output = analyzer_db.get_classifier_output(classifier_output_id)
+
+    logging.debug(
+        f"started to classify with classifier_id: {classifier_id}, classifier_output_id: {classifier_output_id}"
+    )
 
     linear_model = classifier.linear_classifier
     parquet_filepath = classifier_output.parquet_path

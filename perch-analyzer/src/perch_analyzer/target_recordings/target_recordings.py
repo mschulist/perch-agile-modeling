@@ -1,3 +1,4 @@
+import logging
 from perch_analyzer.config import config
 from perch_analyzer.target_recordings import xenocanto
 from perch_analyzer.db import db
@@ -43,11 +44,19 @@ def add_target_recording_from_xc(
 ):
     xc_ids = xenocanto.get_xc_ids(config, ebird_6_code, call_type)
 
-    # TODO: filter out the existing xc_ids that are in the database
+    # TODO: make a native db call to get the list of existing xc ids
 
     xc_ids = xc_ids[:num_recordings]
 
+    existing_targets = db.get_all_target_recordings(include_finished=True)
+    existing_xc_ids = {x.xc_id for x in existing_targets if x.xc_id is not None}
     for xc_id in xc_ids:
+        if xc_id in existing_xc_ids:
+            logging.debug(
+                f"skipping xc id {xc_id} because it is already present in database"
+            )
+            continue
+
         audio = audio_io.load_xc_audio(f"xc{xc_id}", SAMPLE_RATE)
 
         # we only take a single peak because we do not need multiple target recordings from a single xc recording
