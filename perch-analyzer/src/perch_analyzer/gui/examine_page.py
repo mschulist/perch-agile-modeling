@@ -33,6 +33,7 @@ class ExamineState(ConfigState):
 
     # Windows display state
     windows: list[WindowWithMetadata] = []
+    loading_windows: bool = False
 
     # Edit state for each recording (using window_id as key)
     editing_window_id: Optional[int] = None
@@ -110,6 +111,8 @@ class ExamineState(ConfigState):
             label = self.filtered_labels[index]
             self.selected_label = label
             self.editing_window_id = None
+            self.loading_windows = True
+            yield
             self.load_recordings_for_label(label)
 
     @rx.event
@@ -159,6 +162,7 @@ class ExamineState(ConfigState):
         logger.info(f"took {dt.now() - before} to get get all window paths {label}")
 
         self.windows = windows_with_metadata
+        self.loading_windows = False
 
     @rx.event
     def start_editing_by_index(self, index: int):
@@ -461,21 +465,41 @@ def windows_panel() -> rx.Component:
             size="6",
         ),
         rx.cond(
-            ExamineState.selected_label,
-            rx.cond(
-                ExamineState.windows.length() > 0,  # type: ignore
+            ExamineState.loading_windows,
+            rx.center(
                 rx.vstack(
-                    rx.foreach(
-                        rx.Var.range(ExamineState.windows.length()),  # type: ignore
-                        lambda i: window_card(ExamineState.windows[i], i),
+                    rx.spinner(
+                        size="3",
+                        color=rx.color("accent", 9),
                     ),
-                    spacing="4",
-                    width="100%",
-                    overflow_y="auto",
+                    rx.text(
+                        "Loading windows...",
+                        size="3",
+                        color=rx.color("gray", 11),
+                        weight="medium",
+                    ),
+                    spacing="3",
+                    align="center",
                 ),
-                rx.text("No windows found for this label.", size="3"),
+                padding="4em",
             ),
-            rx.text("Select a label to view windows.", size="3"),
+            rx.cond(
+                ExamineState.selected_label,
+                rx.cond(
+                    ExamineState.windows.length() > 0,  # type: ignore
+                    rx.vstack(
+                        rx.foreach(
+                            rx.Var.range(ExamineState.windows.length()),  # type: ignore
+                            lambda i: window_card(ExamineState.windows[i], i),
+                        ),
+                        spacing="4",
+                        width="100%",
+                        overflow_y="auto",
+                    ),
+                    rx.text("No windows found for this label.", size="3"),
+                ),
+                rx.text("Select a label to view windows.", size="3"),
+            ),
         ),
         spacing="4",
         width="100%",
