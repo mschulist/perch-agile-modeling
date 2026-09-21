@@ -1,102 +1,67 @@
-import reflex as rx
+"""List of trained classifiers."""
+
+from collections.abc import Mapping
+from typing import Any
+
+from nicegui import ui
+
 from perch_analyzer.db import db
-from .state import ConfigState
+from perch_analyzer.gui.background import io_bound
+from perch_analyzer.gui.components import loading, page_layout
+from perch_analyzer.gui.format import format_metric
+from perch_analyzer.gui.services import ProjectServices, project
+
+METRIC_LABELS = (
+    ("roc_auc", "AUC-ROC"),
+    ("cmap", "CMAP"),
+    ("top1_acc", "Top-1 Accuracy"),
+)
 
 
-def classifier_card(classifier: db.Classifier) -> rx.Component:
-    """Create a card component for a single classifier."""
-    formatted_date = classifier.datetime.strftime("%B %d, %Y at %I:%M %p")
+def _load(services: ProjectServices) -> list[db.ClassifierInfo]:
+    return services.analyzer_db.get_all_classifiers()
 
-    # Extract metrics
-    auc_roc = classifier.metrics.get("roc_auc", "N/A")
-    cmap = classifier.metrics.get("cmap", "N/A")
-    top1_acc = classifier.metrics.get("top1_acc", "N/A")
 
-    # Format metrics with 4 decimal places if they're numeric
-    if isinstance(auc_roc, (int, float)):
-        auc_roc = f"{auc_roc:.4f}"
-    if isinstance(cmap, (int, float)):
-        cmap = f"{cmap:.4f}"
-    if isinstance(top1_acc, (int, float)):
-        top1_acc = f"{top1_acc:.4f}"
+async def classifiers_page() -> None:
+    services = project()
+    with page_layout("Trained Classifiers"):
+        spinner = loading()
+        body = ui.column().classes("w-full gap-3")
 
-    return rx.box(
-        rx.hstack(
-            rx.vstack(
-                rx.heading(f"Classifier id: {classifier.id}", size="5"),
-                rx.text(formatted_date, style={"fontStyle": "italic"}),
-                align="start",
-                spacing="2",
-            ),
-            rx.vstack(
-                rx.heading("Performance Metrics", size="5"),
-                rx.hstack(
-                    rx.vstack(
-                        rx.text("AUC-ROC", weight="bold"),
-                        rx.heading(str(auc_roc), size="7"),
-                        align="center",
-                    ),
-                    rx.vstack(
-                        rx.text("CMAP", weight="bold"),
-                        rx.heading(str(cmap), size="7"),
-                        align="center",
-                    ),
-                    rx.vstack(
-                        rx.text("Top-1 Accuracy", weight="bold"),
-                        rx.heading(str(top1_acc), size="7"),
-                        align="center",
-                    ),
-                    spacing="6",
-                ),
-                align="start",
-                spacing="2",
-            ),
-            spacing="8",
-            align="start",
+        classifiers = await io_bound(_load, services)
+        spinner.delete()
+
+        with body:
+            if not classifiers:
+                ui.label(
+                    "No classifiers found. Train a classifier to see it here."
+                ).classes("italic text-gray-500")
+                return
+            for classifier in classifiers:
+                classifier_card(classifier)
+
+
+def classifier_card(classifier: db.ClassifierInfo) -> None:
+    with (
+        ui.card()
+        .classes("w-full cursor-pointer hover:bg-gray-100")
+        .on(
+            "click",
+            lambda cid=classifier.id: ui.navigate.to(f"/single_classifier/{cid}"),
         ),
-        padding="1.5em",
-        border="1px solid #e0e0e0",
-        border_radius="8px",
-        margin_bottom="1em",
-        width="100%",
-        on_click=rx.redirect(f"/single_classifier/{classifier.id}"),
-        cursor="pointer",
-        transition="background-color 0.3s ease",
-        _hover={
-            "background_color": "#444444",
-        },
-    )
+        ui.row().classes("w-full gap-12 items-start"),
+    ):
+        with ui.column().classes("gap-1"):
+            ui.label(f"Classifier id: {classifier.id}").classes("text-xl font-semibold")
+            ui.label(classifier.datetime.strftime("%B %d, %Y at %I:%M %p")).classes(
+                "italic text-gray-600"
+            )
+        metrics_row(classifier.metrics)
 
 
-def classifiers():
-    """Display all trained classifiers with their metrics."""
-    analyzer_db = ConfigState.get_analyzer_db()
-    all_classifiers = analyzer_db.get_all_classifiers()
-
-    if not all_classifiers:
-        content = rx.vstack(
-            rx.heading("Trained Classifiers", size="9"),
-            rx.text(
-                "No classifiers found. Train a classifier to see it here.",
-                style={"fontStyle": "italic"},
-            ),
-            spacing="4",
-            align="center",
-        )
-    else:
-        classifier_cards = [
-            classifier_card(classifier) for classifier in all_classifiers
-        ]
-        content = rx.vstack(
-            rx.heading("Trained Classifiers", size="9"),
-            rx.vstack(
-                *classifier_cards,
-                spacing="3",
-                width="100%",
-            ),
-            spacing="4",
-            align="center",
-            width="100%",
-        )
-
-    return rx.center(content)
+def metrics_row(metrics: Mapping[str, Any]) -> None:
+    with ui.row().classes("gap-10"):
+        for key, title in METRIC_LABELS:
+            with ui.column().classes("items-center gap-0"):
+                ui.label(title).classes("font-bold text-sm")
+                ui.label(format_metric(metrics, key)).classes("text-3xl")

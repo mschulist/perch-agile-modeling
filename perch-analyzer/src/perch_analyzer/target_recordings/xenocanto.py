@@ -1,6 +1,7 @@
 import time
-from perch_hoplite.taxonomy import namespace_db
+
 import httpx
+from perch_hoplite.taxonomy import namespace_db
 
 from perch_analyzer.config import config
 
@@ -47,7 +48,7 @@ def convert_ebird_6_code_to_xc_sci_name(ebird_6_code: str):
 
     reversed_mapping = {v: k for k, v in mapping.mapped_pairs.items()}
 
-    xc_sci_name = reversed_mapping.get(ebird_6_code, None)
+    xc_sci_name = reversed_mapping.get(ebird_6_code)
     if xc_sci_name is None:
         raise ValueError(f"Mapping not found for {ebird_6_code}.")
     return xc_sci_name

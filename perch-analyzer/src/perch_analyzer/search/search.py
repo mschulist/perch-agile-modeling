@@ -1,8 +1,8 @@
-from perch_hoplite.db import sqlite_usearch_impl
+from perch_hoplite.db import datatypes, sqlite_usearch_impl
+from perch_hoplite.zoo import model_configs
+
 from perch_analyzer.config import config
 from perch_analyzer.db import db
-from perch_hoplite.zoo import model_configs
-from perch_hoplite.db import datatypes
 
 SEARCH_PROVENANCE = "searched_annotator"
 

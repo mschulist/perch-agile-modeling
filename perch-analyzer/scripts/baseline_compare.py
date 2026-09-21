@@ -1,9 +1,10 @@
-from perch_hoplite.db import sqlite_usearch_impl
 from pathlib import Path
+
 import numpy as np
-from perch_hoplite.taxonomy import namespace_db
 import polars as pl
 from perch_hoplite.agile import metrics
+from perch_hoplite.db import sqlite_usearch_impl
+from perch_hoplite.taxonomy import namespace_db
 from tqdm import tqdm
 
 namespace = namespace_db.load_db()
@@ -186,8 +187,12 @@ transfer_logit_matrix, transfer_annotation_matrix, transfer_labels, transfer_win
     logits_and_multihot_for_windows(transfer_logits, get_label_for_window_id)
 )
 
-perch_roc_auc = metrics.roc_auc(perch_logit_matrix.T, perch_annotation_matrix.T, sample_threshold=10)
-birdnet_roc_auc = metrics.roc_auc(birdnet_logit_matrix.T, birdnet_annotation_matrix.T, sample_threshold=10)
+perch_roc_auc = metrics.roc_auc(
+    perch_logit_matrix.T, perch_annotation_matrix.T, sample_threshold=10
+)
+birdnet_roc_auc = metrics.roc_auc(
+    birdnet_logit_matrix.T, birdnet_annotation_matrix.T, sample_threshold=10
+)
 transfer_roc_auc = metrics.roc_auc(
     transfer_logit_matrix.T, transfer_annotation_matrix.T, sample_threshold=10
 )

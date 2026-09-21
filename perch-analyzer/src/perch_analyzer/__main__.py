@@ -1,3 +1,5 @@
-from .cli import main
+import sys
 
-main()
+from perch_analyzer.cli import main
+
+sys.exit(main())

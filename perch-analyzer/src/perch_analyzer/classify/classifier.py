@@ -1,10 +1,18 @@
+"""Training a custom linear classifier on the annotated windows.
+
+This is the only part of the library that needs TensorFlow, so
+`perch_hoplite.agile.classifier` is imported lazily inside `train_classifier`
+rather than at module scope.
+"""
+
+from datetime import datetime as dt
+
 import numpy as np
-import perch_hoplite.agile.classifier as classifier
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
-from perch_hoplite.agile.classifier_data import AgileDataManager
+
+from perch_analyzer.classify.linear_model import LinearClassifier
 from perch_analyzer.config import config
 from perch_analyzer.db import db
-from datetime import datetime as dt
 
 RNG = 123
 
@@ -15,14 +23,22 @@ def train_classifier(
     analyzer_db: db.AnalyzerDB,
     throwaway_classes: list[str],
     train_ratio: float,
-    max_train_examples_per_label: int,
     learning_rate: float,
     weak_neg_rate: float,
     num_train_steps: int,
 ) -> int:
-    target_labels = tuple(
-        x for x in hoplite_db.get_all_labels() if x not in throwaway_classes
-    )
+    # Imported here because it pulls in TensorFlow, which no other command needs.
+    from perch_hoplite.agile import classifier
+    from perch_hoplite.agile.classifier_data import AgileDataManager
+
+    throwaway = set(throwaway_classes)
+    target_labels = tuple(x for x in hoplite_db.get_all_labels() if x not in throwaway)
+    if not target_labels:
+        raise ValueError(
+            "No labels left to train on. Annotate some windows first, or drop "
+            "some entries from --throwaway_classes."
+        )
+
     data_manager = AgileDataManager(
         target_labels=target_labels,
         db=hoplite_db,
@@ -31,7 +47,6 @@ def train_classifier(
         min_eval_examples=1,
         train_ratio=train_ratio,
         rng=np.random.default_rng(RNG),
-        max_train_examples_per_label=max_train_examples_per_label,
     )
 
     linear_classifier, metrics = classifier.train_linear_classifier(
@@ -46,11 +61,10 @@ def train_classifier(
         embedding_model=config.embedding_model,
         labels=list(target_labels),
         train_ratio=train_ratio,
-        max_train_examples_per_label=max_train_examples_per_label,
         learning_rate=learning_rate,
         weak_neg_rate=weak_neg_rate,
         num_train_steps=num_train_steps,
         rng=RNG,
         metrics=metrics,
-        linear_classifier=linear_classifier,
+        linear_classifier=LinearClassifier.from_hoplite(linear_classifier),
     )
