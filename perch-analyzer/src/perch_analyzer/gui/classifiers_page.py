@@ -6,8 +6,8 @@ from typing import Any
 from nicegui import ui
 
 from perch_analyzer.db import db
-from perch_analyzer.gui.background import io_bound
-from perch_analyzer.gui.components import loading, page_layout
+from perch_analyzer.gui.background import load
+from perch_analyzer.gui.components import loading, page_layout, wait_for_client
 from perch_analyzer.gui.format import format_metric
 from perch_analyzer.gui.services import ProjectServices, project
 
@@ -28,17 +28,18 @@ async def classifiers_page() -> None:
         spinner = loading()
         body = ui.column().classes("w-full gap-3")
 
-        classifiers = await io_bound(_load, services)
-        spinner.delete()
+    await wait_for_client()
+    classifiers = await load(_load, services)
+    spinner.delete()
 
-        with body:
-            if not classifiers:
-                ui.label(
-                    "No classifiers found. Train a classifier to see it here."
-                ).classes("italic text-gray-500")
-                return
-            for classifier in classifiers:
-                classifier_card(classifier)
+    with body:
+        if not classifiers:
+            ui.label(
+                "No classifiers found. Train a classifier to see it here."
+            ).classes("italic text-gray-500")
+            return
+        for classifier in classifiers:
+            classifier_card(classifier)
 
 
 def classifier_card(classifier: db.ClassifierInfo) -> None:

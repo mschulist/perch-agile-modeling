@@ -12,8 +12,8 @@ from ml_collections import config_dict
 from nicegui import ui
 from perch_hoplite.db import datatypes
 
-from perch_analyzer.gui.background import io_bound
-from perch_analyzer.gui.components import loading, page_layout
+from perch_analyzer.gui.background import load
+from perch_analyzer.gui.components import loading, page_layout, wait_for_client
 from perch_analyzer.gui.services import ProjectServices, project
 
 
@@ -48,19 +48,20 @@ async def summary_page() -> None:
         spinner = loading("Reading the databases...")
         body = ui.row().classes("w-full gap-8 items-start")
 
-        summary = await io_bound(_gather, services)
-        spinner.delete()
+    await wait_for_client()
+    summary = await load(_gather, services)
+    spinner.delete()
 
-        with body:
-            with ui.column().classes("gap-2"):
-                for name, value in summary.items():
-                    if name.startswith("_"):
-                        continue
-                    ui.label(f"{name}: {value}").classes("text-xl")
+    with body:
+        with ui.column().classes("gap-2"):
+            for name, value in summary.items():
+                if name.startswith("_"):
+                    continue
+                ui.label(f"{name}: {value}").classes("text-xl")
 
-            with ui.column().classes("grow gap-2"):
-                ui.label("Hoplite DB Metadata").classes("text-2xl font-bold")
-                ui.code(
-                    json.dumps(summary["_metadata"], indent=2, default=str),
-                    language="json",
-                ).classes("w-full")
+        with ui.column().classes("grow gap-2"):
+            ui.label("Hoplite DB Metadata").classes("text-2xl font-bold")
+            ui.code(
+                json.dumps(summary["_metadata"], indent=2, default=str),
+                language="json",
+            ).classes("w-full")

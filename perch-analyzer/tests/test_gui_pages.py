@@ -8,6 +8,8 @@ from nicegui.testing import User
 
 from perch_analyzer.app_context import AppContext
 
+from . import project_shape as shape
+
 
 async def test_home_page(gui: User):
     await gui.open("/")
@@ -18,9 +20,9 @@ async def test_home_page(gui: User):
 async def test_summary_page(gui: User):
     await gui.open("/summary")
     await gui.should_see("Audio Summary")
-    await gui.should_see("Windows: 6")
-    await gui.should_see("Annotations: 4")
-    await gui.should_see("Annotations to be labeled: 2")
+    await gui.should_see(f"Windows: {shape.NUM_WINDOWS}")
+    await gui.should_see(f"Annotations: {shape.NUM_MAIN + shape.NUM_OTHER}")
+    await gui.should_see(f"Annotations to be labeled: {shape.NUM_UNCERTAIN}")
 
 
 async def test_config_page(gui: User):

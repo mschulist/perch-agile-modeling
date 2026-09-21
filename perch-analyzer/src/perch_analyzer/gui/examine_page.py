@@ -2,17 +2,18 @@
 
 import logging
 
-from nicegui import run, ui
+from nicegui import ui
 from nicegui.events import ValueChangeEventArguments
 from perch_hoplite.db import datatypes
 
 from perch_analyzer.examine import examine_annotations
-from perch_analyzer.gui.background import io_bound
+from perch_analyzer.gui.background import load, run_blocking
 from perch_analyzer.gui.components import (
+    SearchableList,
     WindowCard,
     loading,
     page_layout,
-    searchable_list,
+    wait_for_client,
 )
 from perch_analyzer.gui.services import ProjectServices, project
 from perch_analyzer.gui.views import WindowView, build_views
@@ -27,6 +28,10 @@ class ExamineView:
 
     Window ids for a label are fetched once (a single query returning ints);
     only the ids on the current page get their metadata and assets loaded.
+
+    The right-hand panel is split into containers that are created once and
+    then refilled. Clearing a container that holds the widget whose handler is
+    running would delete that widget mid-event.
     """
 
     def __init__(self, services: ProjectServices):
@@ -34,7 +39,9 @@ class ExamineView:
         self.all_labels: list[str] = []
         self.selected_label: str | None = None
         self.window_ids: list[int] = []
+        self.cards: list[WindowCard] = []
         self.page = 1
+        self._updating_pager = False
 
     # --- Data ----------------------------------------------------------
 
@@ -68,93 +75,113 @@ class ExamineView:
             page_layout("Examine"),
             ui.row().classes("w-full gap-6 items-start no-wrap"),
         ):
-            self.left = ui.column().classes("w-[300px] shrink-0 gap-2")
-            self.right = ui.column().classes("grow gap-4 min-w-0")
+            with ui.column().classes("w-[300px] shrink-0 gap-2"):
+                ui.label("Labels").classes("text-2xl font-bold")
+                self.labels_slot = ui.column().classes("w-full")
+            with ui.column().classes("grow gap-4 min-w-0"):
+                self.heading = ui.label("Windows").classes("text-2xl font-bold")
+                self.status = ui.label("Select a label to view windows.").classes(
+                    "text-sm text-gray-500"
+                )
+                self.cards_slot = ui.column().classes("w-full gap-4")
+                self.pager = ui.pagination(
+                    1, 1, value=1, direction_links=True, on_change=self._on_page_change
+                ).classes("self-center")
+                self.pager.visible = False
 
-        with self.left:
+        # Let the browser have the shell before doing anything slow: this both
+        # shows the spinner and takes the work out of the page's
+        # response_timeout budget.
+        await wait_for_client()
+
+        with self.labels_slot:
             spinner = loading("Loading labels...")
-        self.all_labels = await io_bound(self._load_labels)
+        self.all_labels = await load(self._load_labels)
         spinner.delete()
-        self._render_labels()
 
-        with self.right:
-            ui.label("Select a label to view windows.").classes("text-gray-500")
+        with self.labels_slot:
+            self.label_list = SearchableList(self.all_labels, self._on_select_label)
 
-    def _render_labels(self) -> None:
-        self.left.clear()
-        with self.left:
-            ui.label("Labels").classes("text-2xl font-bold")
-            searchable_list(
-                self.all_labels,
-                self._on_select_label,
-                selected=self.selected_label,
-            )
-
-    def _on_select_label(self, label: str) -> None:
+    async def _on_select_label(self, label: str) -> None:
         self.selected_label = label
         self.page = 1
-        self._render_labels()
-        ui.timer(0, self._load_and_render, once=True)
+        self.label_list.set_selected(label)
+        self.heading.text = f"Windows: ({label})"
+        self.status.text = "Loading windows..."
 
-    async def _load_and_render(self) -> None:
-        assert self.selected_label is not None
-        self.right.clear()
-        with self.right:
+        self.cards_slot.clear()
+        with self.cards_slot:
             spinner = loading("Loading windows...")
-        self.window_ids = await io_bound(self._load_window_ids, self.selected_label)
+        self.window_ids = await load(self._load_window_ids, label)
         spinner.delete()
         await self._render_page()
 
     async def _render_page(self) -> None:
-        self.right.clear()
-        label = self.selected_label
         total = len(self.window_ids)
         pages = max(1, -(-total // PAGE_SIZE))
         self.page = min(self.page, pages)
         start = (self.page - 1) * PAGE_SIZE
         page_ids = self.window_ids[start : start + PAGE_SIZE]
 
-        with self.right:
-            ui.label(f"Windows: ({label})").classes("text-2xl font-bold")
-            if total == 0:
-                ui.label("No windows found for this label.")
-                return
-            ui.label(f"Showing {start + 1}-{start + len(page_ids)} of {total}").classes(
-                "text-sm text-gray-500"
-            )
-            spinner = loading("Loading windows...")
+        self._set_pager(pages)
 
-        views = await io_bound(self._load_page, page_ids)
+        if total == 0:
+            self.status.text = "No windows found for this label."
+            self.cards_slot.clear()
+            return
+
+        self.status.text = f"Showing {start + 1}-{start + len(page_ids)} of {total}"
+        self.cards_slot.clear()
+        with self.cards_slot:
+            spinner = loading("Loading windows...")
+        views = await load(self._load_page, page_ids)
         spinner.delete()
 
-        with self.right:
+        self.cards = []
+        with self.cards_slot:
             for view in views:
-                WindowCard(view, self.all_labels, self._on_save)
-            if pages > 1:
-                ui.pagination(
-                    1,
-                    pages,
-                    value=self.page,
-                    direction_links=True,
-                    on_change=self._on_page_change,
-                ).classes("self-center")
+                self.cards.append(WindowCard(view, self.all_labels, self._on_save))
 
-    def _on_page_change(self, event: ValueChangeEventArguments[int | None]) -> None:
-        if event.value and event.value != self.page:
-            self.page = event.value
-            ui.timer(0, self._render_page, once=True)
+    def _set_pager(self, pages: int) -> None:
+        """Resize the pager in place; recreating it would delete the widget
+        whose change handler is running."""
+        self.pager.props(f"max={pages}")
+        self.pager.visible = pages > 1
+        if self.pager.value != self.page:
+            self._updating_pager = True
+            try:
+                self.pager.value = self.page
+            finally:
+                self._updating_pager = False
+
+    async def _on_page_change(
+        self, event: ValueChangeEventArguments[int | None]
+    ) -> None:
+        if self._updating_pager or not event.value or event.value == self.page:
+            return
+        self.page = event.value
+        await self._render_page()
 
     async def _on_save(self, window_id: int, labels: list[str]) -> None:
-        await run.io_bound(self._save, window_id, labels)
+        await run_blocking(self._save, window_id, labels)
         ui.notify("Saved labels", type="positive")
         for label in labels:
             if label not in self.all_labels:
                 self.all_labels.append(label)
                 self.all_labels.sort()
-        # The window may no longer belong under the label being browsed.
+                self.label_list.set_items(self.all_labels)
+        # The window may no longer belong under the label being browsed. Hide
+        # its card rather than re-rendering the page: this runs inside that
+        # card's own save handler.
         if self.selected_label is not None and self.selected_label not in labels:
             self.window_ids = [wid for wid in self.window_ids if wid != window_id]
-            await self._render_page()
+            for card in self.cards:
+                if card.view.window_id == window_id:
+                    card.hide()
+            self.status.text = (
+                f"{len(self.window_ids)} window(s) left under "
+                f"{self.selected_label}; reload the label to refresh the page."
+            )
 
 
 async def examine_page() -> None:

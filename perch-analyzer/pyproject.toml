@@ -60,6 +60,9 @@ ignore = ["E501"]
 [tool.pyrefly]
 # `scripts/` holds one-off research scripts and is deliberately not checked.
 project-includes = ["src", "tests"]
+# `tests` is a package; without the project root on the search path its
+# relative imports cannot be resolved.
+search-path = ["src", "."]
 preset = "strict"
 
 [[tool.pyrefly.sub-config]]

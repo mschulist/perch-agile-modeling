@@ -4,15 +4,16 @@ import logging
 from dataclasses import dataclass
 
 from ml_collections import config_dict
-from nicegui import run, ui
+from nicegui import ui
 from perch_hoplite.db import datatypes
 
 from perch_analyzer.examine import examine_annotations
-from perch_analyzer.gui.background import io_bound
+from perch_analyzer.gui.background import load, run_blocking
 from perch_analyzer.gui.components import (
     label_editor,
     loading,
     page_layout,
+    wait_for_client,
     window_media,
 )
 from perch_analyzer.gui.services import ProjectServices, project
@@ -103,13 +104,15 @@ class AnnotateView:
     async def build(self) -> None:
         with page_layout("Annotate"):
             self.body = ui.column().classes("w-full gap-4")
+        # Rendering a window can take seconds; do it after the shell is out.
+        await wait_for_client()
         await self._load_and_render()
 
     async def _load_and_render(self) -> None:
         self.body.clear()
         with self.body:
             spinner = loading("Finding the next window...")
-        self.current = await io_bound(self._load_next)
+        self.current = await load(self._load_next)
         spinner.delete()
         self._render()
 
@@ -159,7 +162,7 @@ class AnnotateView:
         if current.view is None or current.annotation_id is None:
             return
         labels = sorted(self.select.value or [])
-        await run.io_bound(
+        await run_blocking(
             self._submit, current.annotation_id, current.view.window_id, labels
         )
         await self._load_and_render()

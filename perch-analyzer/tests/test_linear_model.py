@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 
 from perch_analyzer.classify.linear_model import (
     LinearClassifier,
@@ -64,3 +65,25 @@ def test_batched_embedding_iterator_covers_every_id():
 
     assert [len(batch_ids) for batch_ids, _ in batches] == [3, 3, 1]
     assert np.array_equal(np.concatenate([b for b, _ in batches]), ids)
+
+
+async def test_run_blocking_tolerates_a_none_result():
+    """`load` treats None as cancellation; void work must not go through it."""
+    import asyncio
+
+    from perch_analyzer.gui.background import load, run_blocking
+
+    calls = []
+
+    def returns_none() -> None:
+        calls.append(1)
+
+    def returns_value() -> int:
+        return 7
+
+    await run_blocking(returns_none)
+    assert calls == [1]
+    assert await load(returns_value) == 7
+
+    with pytest.raises(asyncio.CancelledError):
+        await load(returns_none)  # type: ignore[arg-type]

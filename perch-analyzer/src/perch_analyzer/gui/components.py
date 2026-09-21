@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable, Iterable, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
-from nicegui import ui
+from nicegui import context, ui
 
 from perch_analyzer.gui.views import WindowView
 
@@ -75,6 +75,16 @@ def window_media(
     ui.audio(audio_url).classes(f"w-full max-w-[{max_width}] mx-auto")
 
 
+async def wait_for_client() -> None:
+    """Hand the page shell to the browser before doing anything slow.
+
+    NiceGUI runs a page function to completion before responding, so work done
+    before this point counts against the page's `response_timeout` and any
+    spinner built before it is never actually seen.
+    """
+    await context.client.connected()
+
+
 def loading(message: str = "Loading...") -> ui.column:
     """A centered spinner, returned so the caller can delete it when done."""
     with ui.column().classes("w-full items-center gap-2 p-8") as column:
@@ -83,40 +93,81 @@ def loading(message: str = "Loading...") -> ui.column:
     return column
 
 
-def searchable_list(
-    items: Sequence[str],
-    on_select: Callable[[str], object],
-    *,
-    placeholder: str = "Search labels...",
-    selected: str | None = None,
-) -> None:
-    """A filter box over a scrollable list of clickable items."""
-    with ui.column().classes("w-full gap-2"):
-        search = (
-            ui.input(placeholder=placeholder).props("dense clearable").classes("w-full")
-        )
-        list_container = ui.column().classes(
-            "w-full gap-1 overflow-y-auto max-h-[600px] border rounded p-2"
-        )
+SELECTED_CLASSES = "bg-primary text-white"
 
-    def render() -> None:
-        query = (search.value or "").lower()
-        matches = [item for item in items if query in item.lower()]
-        list_container.clear()
-        with list_container:
+
+class SearchableList:
+    """A filter box over a scrollable list of clickable items.
+
+    Selecting an item only restyles the existing buttons. Rebuilding the list
+    here would delete the very button whose click handler is running, and any
+    element created afterwards in the ambient slot context would then fail to
+    resolve its (garbage-collected) parent.
+    """
+
+    def __init__(
+        self,
+        items: Sequence[str],
+        on_select: Callable[[str], object],
+        *,
+        placeholder: str = "Search labels...",
+        selected: str | None = None,
+        empty_message: str = "No labels found",
+    ):
+        self.items = list(items)
+        self.on_select = on_select
+        self.selected = selected
+        self.empty_message = empty_message
+        self._buttons: dict[str, ui.button] = {}
+
+        with ui.column().classes("w-full gap-2"):
+            # The search box lives outside the list, so rebuilding the list
+            # from its handler never deletes the handler's own element.
+            self._search = (
+                ui.input(placeholder=placeholder)
+                .props("dense clearable")
+                .classes("w-full")
+            )
+            self._list = ui.column().classes(
+                "w-full gap-1 overflow-y-auto max-h-[600px] border rounded p-2"
+            )
+        self._search.on_value_change(self._render)
+        self._render()
+
+    def set_items(self, items: Sequence[str]) -> None:
+        self.items = list(items)
+        self._render()
+
+    def set_selected(self, item: str | None) -> None:
+        """Highlight `item`, leaving the buttons themselves in place."""
+        self.selected = item
+        for value, button in self._buttons.items():
+            self._apply_selection(button, value == item)
+
+    @staticmethod
+    def _apply_selection(button: ui.button, is_selected: bool) -> None:
+        if is_selected:
+            button.classes(add=SELECTED_CLASSES)
+        else:
+            button.classes(remove=SELECTED_CLASSES)
+
+    def _render(self) -> None:
+        query = (self._search.value or "").lower()
+        matches = [item for item in self.items if query in item.lower()]
+        self._buttons = {}
+        self._list.clear()
+        with self._list:
             if not matches:
-                ui.label("No labels found").classes("text-gray-500 text-sm")
+                ui.label(self.empty_message).classes("text-gray-500 text-sm")
                 return
             for item in matches:
-                classes = "w-full justify-start"
-                if item == selected:
-                    classes += " bg-primary text-white"
-                ui.button(item, on_click=lambda i=item: on_select(i)).props(
-                    "flat no-caps dense align=left"
-                ).classes(classes)
-
-    search.on_value_change(render)
-    render()
+                button = (
+                    ui.button(item, on_click=lambda i=item: self.on_select(i))
+                    .props("flat no-caps dense align=left")
+                    .classes("w-full justify-start")
+                )
+                self._apply_selection(button, item == self.selected)
+                self._buttons[item] = button
 
 
 def label_editor(
@@ -162,7 +213,7 @@ class WindowCard:
 
     def _build(self) -> None:
         view = self.view
-        with ui.card().classes("w-full max-w-[780px] p-3 gap-2"):
+        with ui.card().classes("w-full max-w-[780px] p-3 gap-2") as self.container:
             ui.label(view.filename).classes("text-xl font-semibold")
 
             with ui.row().classes("gap-6 items-center text-sm"):
@@ -217,7 +268,13 @@ class WindowCard:
     async def _save(self) -> None:
         assert self.on_save is not None
         labels = sorted(self.select.value or [])
-        await self.on_save(self.view.window_id, labels)
+        # Update our own UI before handing off: `on_save` is allowed to hide or
+        # discard this card, and touching a deleted element afterwards warns.
         self.view.labels = labels
         self._render_chips()
         self._cancel()
+        await self.on_save(self.view.window_id, labels)
+
+    def hide(self) -> None:
+        """Take this card off the page without deleting it."""
+        self.container.visible = False

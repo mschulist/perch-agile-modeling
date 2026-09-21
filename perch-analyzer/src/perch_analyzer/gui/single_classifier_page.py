@@ -3,9 +3,9 @@
 from nicegui import ui
 
 from perch_analyzer.db import db
-from perch_analyzer.gui.background import io_bound
+from perch_analyzer.gui.background import load
 from perch_analyzer.gui.classifiers_page import metrics_row
-from perch_analyzer.gui.components import loading, page_layout
+from perch_analyzer.gui.components import loading, page_layout, wait_for_client
 from perch_analyzer.gui.services import ProjectServices, project
 
 
@@ -31,60 +31,55 @@ async def single_classifier_page(classifier_id: int) -> None:
         spinner = loading()
         body = ui.column().classes("w-full gap-4")
 
-        classifier, outputs = await io_bound(_load, services, classifier_id)
-        spinner.delete()
+    await wait_for_client()
+    classifier, outputs = await load(_load, services, classifier_id)
+    spinner.delete()
 
-        with body:
-            if classifier is None:
-                ui.label(f"No classifier found with id: {classifier_id}").classes(
-                    "text-2xl font-bold"
+    with body:
+        if classifier is None:
+            ui.label(f"No classifier found with id: {classifier_id}").classes(
+                "text-2xl font-bold"
+            )
+            return
+
+        with ui.row().classes("items-baseline gap-3"):
+            ui.label(f"Classifier id: {classifier.id}").classes("text-3xl font-bold")
+            ui.label(
+                f"({classifier.datetime.strftime('%B %d, %Y at %I:%M %p')})"
+            ).classes("text-lg text-gray-600")
+
+        with ui.card().classes("w-full"):
+            with ui.row().classes("w-full gap-12 items-start"):
+                with ui.column().classes("gap-1"):
+                    ui.label("Hyper Parameters").classes("text-xl font-semibold")
+                    ui.label(f"Training Ratio: {classifier.train_ratio}")
+                    ui.label(f"Number of Training Steps: {classifier.num_train_steps}")
+                    ui.label(f"Weak Negative Rate: {classifier.weak_neg_rate}")
+                    ui.label(f"Learning Rate: {classifier.learning_rate}")
+                with ui.column().classes("gap-1"):
+                    ui.label("Performance Metrics").classes("text-xl font-semibold")
+                    metrics_row(classifier.metrics)
+
+            ui.label(f"Labels ({len(classifier.labels)})").classes("font-bold")
+            with ui.row().classes("gap-1 max-h-[14rem] overflow-y-auto"):
+                for label in classifier.labels:
+                    ui.chip(label).props("outline dense")
+
+        ui.separator()
+        ui.label("Classifier Outputs").classes("text-2xl font-bold")
+        if not outputs:
+            ui.label(
+                "No runs yet. Use `perch-analyzer run_classifier` to make one."
+            ).classes("italic text-gray-500")
+        for output in outputs:
+            with (
+                ui.card()
+                .classes("w-full cursor-pointer hover:bg-gray-100")
+                .on(
+                    "click",
+                    lambda oid=output.id: ui.navigate.to(f"/classifier_output/{oid}"),
                 )
-                return
-
-            with ui.row().classes("items-baseline gap-3"):
-                ui.label(f"Classifier id: {classifier.id}").classes(
-                    "text-3xl font-bold"
+            ):
+                ui.label(f"Classifier Output Id: {output.id}").classes(
+                    "text-lg font-semibold"
                 )
-                ui.label(
-                    f"({classifier.datetime.strftime('%B %d, %Y at %I:%M %p')})"
-                ).classes("text-lg text-gray-600")
-
-            with ui.card().classes("w-full"):
-                with ui.row().classes("w-full gap-12 items-start"):
-                    with ui.column().classes("gap-1"):
-                        ui.label("Hyper Parameters").classes("text-xl font-semibold")
-                        ui.label(f"Training Ratio: {classifier.train_ratio}")
-                        ui.label(
-                            f"Number of Training Steps: {classifier.num_train_steps}"
-                        )
-                        ui.label(f"Weak Negative Rate: {classifier.weak_neg_rate}")
-                        ui.label(f"Learning Rate: {classifier.learning_rate}")
-                    with ui.column().classes("gap-1"):
-                        ui.label("Performance Metrics").classes("text-xl font-semibold")
-                        metrics_row(classifier.metrics)
-
-                ui.label(f"Labels ({len(classifier.labels)})").classes("font-bold")
-                with ui.row().classes("gap-1 max-h-[14rem] overflow-y-auto"):
-                    for label in classifier.labels:
-                        ui.chip(label).props("outline dense")
-
-            ui.separator()
-            ui.label("Classifier Outputs").classes("text-2xl font-bold")
-            if not outputs:
-                ui.label(
-                    "No runs yet. Use `perch-analyzer run_classifier` to make one."
-                ).classes("italic text-gray-500")
-            for output in outputs:
-                with (
-                    ui.card()
-                    .classes("w-full cursor-pointer hover:bg-gray-100")
-                    .on(
-                        "click",
-                        lambda oid=output.id: ui.navigate.to(
-                            f"/classifier_output/{oid}"
-                        ),
-                    )
-                ):
-                    ui.label(f"Classifier Output Id: {output.id}").classes(
-                        "text-lg font-semibold"
-                    )

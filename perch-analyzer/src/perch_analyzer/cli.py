@@ -60,6 +60,8 @@ def handle_gui(ctx: AppContext, args: argparse.Namespace) -> None:
         port=args.port,
         show=not args.no_browser,
         reload=False,
+        response_timeout=args.page_timeout,
+        reconnect_timeout=args.reconnect_timeout,
     )
 
 
@@ -163,6 +165,8 @@ def init_args(parser: argparse.ArgumentParser) -> None:
 
 
 def gui_args(parser: argparse.ArgumentParser) -> None:
+    from perch_analyzer.gui import app as gui_app
+
     parser.add_argument(
         "--host", type=str, default="127.0.0.1", help="Address to bind to."
     )
@@ -171,6 +175,21 @@ def gui_args(parser: argparse.ArgumentParser) -> None:
         "--no-browser",
         action="store_true",
         help="Do not open a browser window on startup.",
+    )
+    parser.add_argument(
+        "--page_timeout",
+        type=float,
+        default=gui_app.DEFAULT_RESPONSE_TIMEOUT,
+        help=(
+            "Seconds a page may take to build before the browser gives up. "
+            "Raise it if rendering spectrograms for a large project times out."
+        ),
+    )
+    parser.add_argument(
+        "--reconnect_timeout",
+        type=float,
+        default=gui_app.DEFAULT_RECONNECT_TIMEOUT,
+        help="Seconds the server keeps a disconnected browser's state alive.",
     )
 
 

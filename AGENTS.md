@@ -104,15 +104,29 @@ node toolchain — that is the point, so keep it that way.
 
 - Pages are registered in `gui/app.py` and run per request, so they always read
   fresh data. Do not hoist database work to module import time.
-- Blocking work goes through `gui/background.io_bound`, which turns NiceGUI's
-  cancellation `None` into a `CancelledError`. Use `nicegui.run.io_bound`
-  directly only for callbacks that return nothing.
+- Blocking work goes through `gui/background.py`: `load()` for callbacks that
+  return a value (it raises `CancelledError` rather than handing back NiceGUI's
+  ambiguous `None`), `run_blocking()` for callbacks that return nothing.
+  Passing a void callback to `load()` raises `CancelledError` on every call,
+  and because that is a `BaseException` it is not logged.
+- **Never delete the element whose handler is running.** Clicking a list item
+  must not rebuild the list, and a paging handler must not recreate the pager;
+  NiceGUI holds the parent by weakref, so anything created afterwards in the
+  ambient slot context dies with "The parent element this slot belongs to has
+  been deleted". Restyle in place (`SearchableList.set_selected`), resize in
+  place (`pager.props(f"max={n}")`), or hide (`WindowCard.hide()`).
+- Pages must `await wait_for_client()` before touching the databases. Until
+  that returns the browser has nothing, so spinners are invisible and the work
+  counts against the page's `response_timeout`.
 - `ui.image` is Quasar's `q-img` and crops to its own aspect-ratio box. Use
   `gui/components.spectrogram()` (which passes `tag=img`) for spectrograms.
 - Shared widgets live in `gui/components.py`. Add to it rather than
   re-implementing a label picker per page.
 - Window lists are paginated; load ids first, then details for the visible page
   only.
+- Page timeouts default to 60s (build) and 30s (reconnect), overridable with
+  `--page_timeout` and `--reconnect_timeout`. NiceGUI's own 3s defaults are far
+  too short once spectrograms are rendered on demand.
 
 ### Long jobs stay on the CLI
 
@@ -124,9 +138,14 @@ without asking.
 
 `tests/conftest.py` builds a real project on disk — hoplite database, windows
 cut from `ARU_test_data/`, annotations, a classifier and a classifier output —
-and exposes it as `project_dir`, `ctx` and `gui`. The `gui` fixture wires the
-pages up to NiceGUI's simulated client, so page tests exercise the real
-server-side rendering without a browser.
+and exposes it as `project_dir`, `ctx` and `gui`. Its dimensions live in
+`tests/project_shape.py` so tests can assert against them. The `gui` fixture
+wires the pages up to NiceGUI's simulated client, so page tests exercise the
+real server-side rendering without a browser.
+
+`tests/test_gui_interactions.py` clicks through the pages. Add to it when you
+touch an event handler: rendering a page proves far less than driving it, and
+every GUI bug found so far has been in a handler, not in a first render.
 
 Commands that need the 779 MB perch_v2 download or the Xeno-canto API
 (`embed`, `search`, `target_recordings`) are not covered; verify those by hand.
