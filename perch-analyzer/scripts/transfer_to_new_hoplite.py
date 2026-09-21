@@ -1,6 +1,6 @@
 import sqlite3
 import dataclasses
-from perch_hoplite.db import sqlite_usearch_impl, interface
+from perch_hoplite.db import sqlite_usearch_impl, datatypes
 import numpy as np
 from tqdm import tqdm
 
@@ -58,7 +58,7 @@ class Annotation:
     id: int
     window_id: int
     label: str
-    label_type: interface.LabelType
+    label_type: datatypes.LabelType
     provenance: str
 
 
@@ -73,7 +73,7 @@ def get_all_annotations(cursor):
     columns = [col[0] for col in cursor.description]
     for result in cursor.fetchall():
         annotation = Annotation(**dict(zip(columns, result)))
-        annotation.label_type = interface.LabelType(annotation.label_type)
+        annotation.label_type = datatypes.LabelType(annotation.label_type)
         annotations.append(annotation)
     return annotations
 

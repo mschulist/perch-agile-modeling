@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 from perch_analyzer.gui.state import ConfigState
 from perch_analyzer.examine import examine_annotations, audio_windows
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 from ml_collections import config_dict
 
 
@@ -38,7 +38,7 @@ class AnnotateState(ConfigState):
 
         # Get all POSSIBLE annotations
         annotations = hoplite_db.get_all_annotations(
-            config_dict.create(eq=dict(label_type=interface.LabelType.UNCERTAIN))
+            config_dict.create(eq=dict(label_type=datatypes.LabelType.UNCERTAIN))
         )
 
         # Check if there are no more windows
@@ -147,7 +147,7 @@ class AnnotateState(ConfigState):
 
         # Get the POSSIBLE annotation to remove
         annotations = hoplite_db.get_all_annotations(
-            config_dict.create(eq=dict(label_type=interface.LabelType.UNCERTAIN))
+            config_dict.create(eq=dict(label_type=datatypes.LabelType.UNCERTAIN))
         )
 
         if annotations:

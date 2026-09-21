@@ -4,7 +4,7 @@ from typing import Optional
 from perch_analyzer.gui.state import ConfigState
 from perch_analyzer.db import db
 from perch_analyzer.examine import audio_windows, examine_annotations
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 from pathlib import Path
 import os
 from ml_collections import config_dict
@@ -128,7 +128,7 @@ class ClassifierOutputState(ConfigState):
 
         # Get annotated labels from hoplite
         hoplite_labels = set(
-            hoplite_db.get_all_labels(label_type=interface.LabelType.POSITIVE)
+            hoplite_db.get_all_labels(label_type=datatypes.LabelType.POSITIVE)
         )
 
         # Get classifier output labels from analyzer db

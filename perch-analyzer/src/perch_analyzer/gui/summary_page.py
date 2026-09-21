@@ -1,5 +1,5 @@
 import reflex as rx
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 from ml_collections import config_dict
 from .state import ConfigState
 
@@ -81,7 +81,7 @@ def summary():
     embedding_count = hoplite_db.count_embeddings()
     annotation_count = len(
         hoplite_db.get_all_annotations(
-            filter=config_dict.create(eq=dict(label_type=interface.LabelType.POSITIVE))
+            filter=config_dict.create(eq=dict(label_type=datatypes.LabelType.POSITIVE))
         )
     )
     recording_count = len(hoplite_db.get_all_recordings())
@@ -90,7 +90,7 @@ def summary():
     unfinished_target_recordings_count = analyzer_db.count_target_recordings(False)
     annotations_to_be_labeled = len(
         hoplite_db.get_all_annotations(
-            filter=config_dict.create(eq=dict(label_type=interface.LabelType.UNCERTAIN))
+            filter=config_dict.create(eq=dict(label_type=datatypes.LabelType.UNCERTAIN))
         )
     )
 

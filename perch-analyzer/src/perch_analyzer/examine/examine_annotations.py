@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 from perch_analyzer.config import config
 
@@ -9,9 +9,9 @@ from ml_collections import config_dict
 class WindowWithAnnotations(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    recording: interface.Recording
-    window: interface.Window
-    annotations: list[interface.Annotation]
+    recording: datatypes.Recording
+    window: datatypes.Window
+    annotations: list[datatypes.Annotation]
 
 
 def get_windows_by_label(
@@ -19,7 +19,7 @@ def get_windows_by_label(
 ) -> list[WindowWithAnnotations]:
     window_ids = hoplite_db.match_window_ids(
         annotations_filter=config_dict.create(
-            eq=dict(label=label, label_type=interface.LabelType.POSITIVE)
+            eq=dict(label=label, label_type=datatypes.LabelType.POSITIVE)
         )
     )
 
@@ -75,7 +75,7 @@ def update_labels(
             window.recording_id,
             offsets=window.offsets,
             label=lab,
-            label_type=interface.LabelType.POSITIVE,
+            label_type=datatypes.LabelType.POSITIVE,
             provenance=config.user_name,
         )
 

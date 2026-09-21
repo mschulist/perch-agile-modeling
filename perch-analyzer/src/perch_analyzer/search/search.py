@@ -2,7 +2,7 @@ from perch_hoplite.db import sqlite_usearch_impl
 from perch_analyzer.config import config
 from perch_analyzer.db import db
 from perch_hoplite.zoo import model_configs
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 
 SEARCH_PROVENANCE = "searched_annotator"
 
@@ -33,7 +33,7 @@ def search_using_target_recordings(
                 offsets=window.offsets,
                 label=target_recording.label,
                 provenance=SEARCH_PROVENANCE,
-                label_type=interface.LabelType.UNCERTAIN,
+                label_type=datatypes.LabelType.UNCERTAIN,
             )
         db.set_finish_target_recording(target_recording.id, True)
 

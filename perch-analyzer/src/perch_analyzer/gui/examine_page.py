@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 from perch_analyzer.gui.state import ConfigState
 from perch_analyzer.examine import examine_annotations, audio_windows
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 import logging
 from datetime import datetime as dt
 
@@ -88,7 +88,7 @@ class ExamineState(ConfigState):
         """Load all labels from the database."""
         hoplite_db = self.get_hoplite_db().thread_split()
         self.all_labels = list(
-            hoplite_db.get_all_labels(label_type=interface.LabelType.POSITIVE)
+            hoplite_db.get_all_labels(label_type=datatypes.LabelType.POSITIVE)
         )
         self.filtered_labels = self.all_labels.copy()
 

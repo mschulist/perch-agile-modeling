@@ -1,6 +1,6 @@
 from perch_analyzer.config import config
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
-from perch_hoplite.db import interface
+from perch_hoplite.db import datatypes
 from perch_hoplite import audio_io
 from perch_hoplite.agile import embedding_display
 from pathlib import Path
@@ -47,8 +47,8 @@ def get_audio_window_path(
 
 
 def flush_window_to_disk(
-    recording: interface.Recording,
-    window: interface.Window,
+    recording: datatypes.Recording,
+    window: datatypes.Window,
     sample_rate: int,
     window_size_s: float,
     base_path: str,
