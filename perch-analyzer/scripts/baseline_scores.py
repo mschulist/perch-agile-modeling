@@ -1,13 +1,12 @@
-from perch_hoplite.db import sqlite_usearch_impl
-from perch_hoplite.zoo import model_configs
-from ml_collections import config_dict
-from datetime import datetime as dt
-from tqdm import tqdm
-from collections import defaultdict
-from perch_hoplite import audio_io
 from pathlib import Path
+
 import numpy as np
+from ml_collections import config_dict
+from perch_hoplite import audio_io
+from perch_hoplite.db import sqlite_usearch_impl
 from perch_hoplite.taxonomy import namespace_db
+from perch_hoplite.zoo import model_configs
+from tqdm import tqdm
 
 namespace = namespace_db.load_db()
 
@@ -82,7 +81,7 @@ for i, label in enumerate(perch_classes):
 
 perch_classes_subset = np.array(perch_classes)[perch_logits_mask]
 
-with open(WORK_DIR / "birdnet_classes.txt", "r") as f:
+with open(WORK_DIR / "birdnet_classes.txt") as f:
     birdnet_classes = []
     for line in f.readlines():
         birdnet_classes.append(line.split("_")[0])

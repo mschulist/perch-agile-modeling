@@ -1,215 +1,85 @@
-from perch_analyzer.gui.state import ConfigState
+"""Detail view for one classifier: hyperparameters, metrics and its runs."""
+
+from nicegui import ui
+
 from perch_analyzer.db import db
-import reflex as rx
-
-NA_STR = "N/A"
-
-
-def classifier_card() -> rx.Component:
-    """Create a card component for a single classifier."""
-    return rx.box(
-        rx.hstack(
-            rx.vstack(
-                rx.heading("Hyper Parameters", size="5"),
-                rx.text(f"Training Ratio: {SingleClassifierState.train_ratio}"),
-                rx.text(
-                    f"Number of Training Steps: {SingleClassifierState.num_train_steps}"
-                ),
-                rx.text(f"Weak Negative Rate: {SingleClassifierState.weak_neg_rate}"),
-                rx.text(f"Learning Rate: {SingleClassifierState.learning_rate}"),
-                rx.box(
-                    rx.text(f"Labels: {SingleClassifierState.labels}"),
-                    max_height="20em",
-                    overflow_y="auto",
-                    max_width="20em",
-                ),
-                align="start",
-                spacing="2",
-            ),
-            rx.vstack(
-                rx.heading("Performance Metrics", size="5"),
-                rx.hstack(
-                    rx.vstack(
-                        rx.text("AUC-ROC", weight="bold"),
-                        rx.heading(SingleClassifierState.formatted_auc_roc, size="7"),
-                        align="center",
-                    ),
-                    rx.vstack(
-                        rx.text("CMAP", weight="bold"),
-                        rx.heading(SingleClassifierState.formatted_cmap, size="7"),
-                        align="center",
-                    ),
-                    rx.vstack(
-                        rx.text("Top-1 Accuracy", weight="bold"),
-                        rx.heading(SingleClassifierState.formatted_top1_acc, size="7"),
-                        align="center",
-                    ),
-                    spacing="6",
-                ),
-                align="start",
-                spacing="2",
-            ),
-            spacing="8",
-            align="start",
-        ),
-        padding="1.5em",
-        border="1px solid #e0e0e0",
-        border_radius="8px",
-        margin_bottom="1em",
-        width="100%",
-    )
+from perch_analyzer.gui.background import load
+from perch_analyzer.gui.classifiers_page import metrics_row
+from perch_analyzer.gui.components import loading, page_layout, wait_for_client
+from perch_analyzer.gui.services import ProjectServices, project
 
 
-def classifier_output_card(classifier_output_id: int) -> rx.Component:
-    return rx.box(
-        rx.heading(f"Classifier Output Id: {classifier_output_id}"),
-        border="1px solid #e0e0e0",
-        border_radius="8px",
-        padding="0.5em",
-        margin_top="1em",
-        on_click=rx.redirect(f"/classifier_output/{classifier_output_id}"),
-        cursor="pointer",
-        transition="background-color 0.3s ease",
-        _hover={
-            "background_color": "#444444",
-        },
-    )
+def _load(
+    services: ProjectServices, classifier_id: int
+) -> tuple[db.ClassifierInfo | None, list[db.ClassifierOutput]]:
+    """Read the classifier and its outputs in one trip.
+
+    The Reflex version reloaded the classifier from disk once per displayed
+    field; this reads it once, and never loads its weights at all.
+    """
+    analyzer_db = services.analyzer_db
+    try:
+        classifier = analyzer_db.get_classifier_info(classifier_id)
+    except Exception:
+        return None, []
+    return classifier, analyzer_db.get_all_classifier_outputs(classifier_id)
 
 
-class SingleClassifierState(ConfigState):
-    @rx.var
-    def classifier_id(self) -> str:
-        """Get the classifier ID from the URL route parameter."""
-        return self.router.page.params.get("id", "")
+async def single_classifier_page(classifier_id: int) -> None:
+    services = project()
+    with page_layout():
+        spinner = loading()
+        body = ui.column().classes("w-full gap-4")
 
-    def _get_classifier(self) -> db.Classifier | None:
-        """Helper method to get the classifier object from the database."""
-        if not self.classifier_id:
-            return None
+    await wait_for_client()
+    classifier, outputs = await load(_load, services, classifier_id)
+    spinner.delete()
 
-        analyzer_db = ConfigState.get_analyzer_db()
-        try:
-            return analyzer_db.get_classifier(int(self.classifier_id))
-        except Exception as _:
-            return None
+    with body:
+        if classifier is None:
+            ui.label(f"No classifier found with id: {classifier_id}").classes(
+                "text-2xl font-bold"
+            )
+            return
 
-    @rx.var
-    def classifier(self) -> db.Classifier | None:
-        """Get the classifier object from the database."""
-        return self._get_classifier()
+        with ui.row().classes("items-baseline gap-3"):
+            ui.label(f"Classifier id: {classifier.id}").classes("text-3xl font-bold")
+            ui.label(
+                f"({classifier.datetime.strftime('%B %d, %Y at %I:%M %p')})"
+            ).classes("text-lg text-gray-600")
 
-    @rx.var
-    def formatted_datetime(self) -> str:
-        """Format the classifier datetime."""
-        clf = self._get_classifier()
-        if clf:
-            return clf.datetime.strftime("%B %d, %Y at %I:%M %p")
-        return ""
+        with ui.card().classes("w-full"):
+            with ui.row().classes("w-full gap-12 items-start"):
+                with ui.column().classes("gap-1"):
+                    ui.label("Hyper Parameters").classes("text-xl font-semibold")
+                    ui.label(f"Training Ratio: {classifier.train_ratio}")
+                    ui.label(f"Number of Training Steps: {classifier.num_train_steps}")
+                    ui.label(f"Weak Negative Rate: {classifier.weak_neg_rate}")
+                    ui.label(f"Learning Rate: {classifier.learning_rate}")
+                with ui.column().classes("gap-1"):
+                    ui.label("Performance Metrics").classes("text-xl font-semibold")
+                    metrics_row(classifier.metrics)
 
-    @rx.var
-    def formatted_auc_roc(self) -> str:
-        """Format AUC-ROC metric."""
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        auc_roc = clf.metrics.get("roc_auc")
-        if auc_roc is not None:
-            return f"{auc_roc:.4f}"
-        return NA_STR
+            ui.label(f"Labels ({len(classifier.labels)})").classes("font-bold")
+            with ui.row().classes("gap-1 max-h-[14rem] overflow-y-auto"):
+                for label in classifier.labels:
+                    ui.chip(label).props("outline dense")
 
-    @rx.var
-    def formatted_cmap(self) -> str:
-        """Format CMAP metric."""
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        cmap = clf.metrics.get("cmap")
-        if cmap is not None:
-            return f"{cmap:.4f}"
-        return NA_STR
-
-    @rx.var
-    def formatted_top1_acc(self) -> str:
-        """Format Top-1 Accuracy metric."""
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        top1_acc = clf.metrics.get("top1_acc")
-        if top1_acc is not None:
-            return f"{top1_acc:.4f}"
-        return NA_STR
-
-    @rx.var
-    def train_ratio(self) -> str:
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        return str(clf.train_ratio)
-
-    @rx.var
-    def learning_rate(self) -> str:
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        return str(clf.learning_rate)
-
-    @rx.var
-    def weak_neg_rate(self) -> str:
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        return str(clf.weak_neg_rate)
-
-    @rx.var
-    def num_train_steps(self) -> str:
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        return str(clf.num_train_steps)
-
-    @rx.var(cache=False)
-    def labels(self) -> str:
-        clf = self._get_classifier()
-        if not clf:
-            return NA_STR
-        return str(clf.labels)
-
-    @rx.var(cache=False)
-    def classifier_outputs(self) -> list[db.ClassifierOutput]:
-        clf = self._get_classifier()
-        if not clf:
-            return []
-        analyzer_db = ConfigState.get_analyzer_db()
-        return analyzer_db.get_all_classifier_outputs(clf.id)
-
-
-def single_classifier_page():
-    return rx.container(
-        rx.cond(
-            SingleClassifierState.classifier.is_none(),  # type: ignore
-            rx.heading(
-                f"No classifier found with id: {SingleClassifierState.classifier_id}"
-            ),
-            rx.vstack(
-                rx.hstack(
-                    rx.heading(
-                        f"Classifier id: {SingleClassifierState.classifier_id}",
-                        size="8",
-                    ),
-                    rx.heading(
-                        f"({SingleClassifierState.formatted_datetime})", size="4"
-                    ),
-                    align="center",
-                ),
-                classifier_card(),
-            ),
-        ),
-        rx.divider(orientation="horizontal", margin_top="1em", margin_bottom="1em"),
-        rx.heading("Classifier Outputs", size="8"),
-        SingleClassifierState.classifier_outputs.foreach(
-            lambda classifier_output: classifier_output_card(classifier_output.id)
-        ),
-    )
-
-
-# type: ignore
+        ui.separator()
+        ui.label("Classifier Outputs").classes("text-2xl font-bold")
+        if not outputs:
+            ui.label(
+                "No runs yet. Use `perch-analyzer run_classifier` to make one."
+            ).classes("italic text-gray-500")
+        for output in outputs:
+            with (
+                ui.card()
+                .classes("w-full cursor-pointer hover:bg-gray-100")
+                .on(
+                    "click",
+                    lambda oid=output.id: ui.navigate.to(f"/classifier_output/{oid}"),
+                )
+            ):
+                ui.label(f"Classifier Output Id: {output.id}").classes(
+                    "text-lg font-semibold"
+                )

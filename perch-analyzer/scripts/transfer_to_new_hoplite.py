@@ -1,14 +1,14 @@
-import sqlite3
 import dataclasses
-from perch_hoplite.db import sqlite_usearch_impl, datatypes
+import sqlite3
+
 import numpy as np
+from perch_hoplite.db import datatypes, sqlite_usearch_impl
 from tqdm import tqdm
 
 old_db = sqlite_usearch_impl.SQLiteUSearchDB.create("data/hoplite")
 new_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
     "data/hoplite_new", sqlite_usearch_impl.get_default_usearch_config(1536)
 )
-
 
 
 def migrate_table(conn: sqlite3.Connection, table: str):

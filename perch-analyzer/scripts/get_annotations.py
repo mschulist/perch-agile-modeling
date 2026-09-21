@@ -1,8 +1,8 @@
-from perch_hoplite.db import sqlite_usearch_impl
-from ml_collections import config_dict
-from datetime import datetime as dt
-from tqdm import tqdm
 from collections import defaultdict
+
+from ml_collections import config_dict
+from perch_hoplite.db import sqlite_usearch_impl
+from tqdm import tqdm
 
 hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create("data/hoplite")
 

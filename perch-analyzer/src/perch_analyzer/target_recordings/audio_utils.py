@@ -5,11 +5,12 @@ General utilities for processing audio and spectrograms.
 Taken directly from the Perch repository
 """
 
-from . import signal
 from jax import numpy as jnp
 from jax import scipy as jsp
 from jax.typing import ArrayLike
 from scipy import signal as scipy_signal
+
+from . import signal
 
 
 def pad_to_length_if_shorter(audio: jnp.ndarray, target_length: int):

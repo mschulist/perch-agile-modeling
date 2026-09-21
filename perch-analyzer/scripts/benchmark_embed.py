@@ -1,12 +1,10 @@
-from typing import Callable
-
-# from perch_hoplite.zoo import model_configs
-import onnxruntime as ort
-import numpy as np
+import functools
+from collections.abc import Callable
 from datetime import datetime as dt
 
+import numpy as np
+import onnxruntime as ort
 from tqdm import tqdm
-
 
 SAMPLE_RATE = 32000
 WINDOW_SIZE_S = 5
@@ -14,8 +12,6 @@ WINDOW_SIZE_S = 5
 WARMUP = 10
 
 onnx_model_path = "/home/mschulist/perch-agile-modeling/perch-analyzer/data/models/perch_v2_no_dft.onnx"
-
-# tf_model = model_configs.load_model_by_name("perch_v2")
 
 sess_opts = ort.SessionOptions()
 sess_opts.intra_op_num_threads = 16
@@ -28,8 +24,15 @@ session = ort.InferenceSession(
 print(ort.get_available_providers())
 
 
+@functools.cache
+def _tf_model():
+    from perch_hoplite.zoo import model_configs
+
+    return model_configs.load_model_by_name("perch_v2")
+
+
 def embed_tf_model(audio_batch: np.ndarray):
-    return tf_model.batch_embed(audio_batch)
+    return _tf_model().batch_embed(audio_batch)
 
 
 def embed_onnx_model(audio_batch: np.ndarray):

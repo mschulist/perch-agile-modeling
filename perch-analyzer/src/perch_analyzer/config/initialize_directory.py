@@ -1,12 +1,38 @@
+import logging
 from pathlib import Path
-from perch_hoplite.db import sqlite_usearch_impl
-from perch_analyzer.db.db import AnalyzerDB
-from perch_analyzer.config.config import Config
-from perch_hoplite.zoo import model_configs
+
+from perch_analyzer.config.config import CONFIG_FILENAME, Config
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_DIRS = {
+    "classifiers_dir": "classifiers",
+    "classifier_outputs_dir": "classifier_outputs",
+    "precomputed_windows_dir": "precomputed_windows",
+    "target_recordings_dir": "target_recordings",
+}
 
 
-def check_initialized(data_path: Path):
-    return (data_path / "config.yaml").exists()
+def check_initialized(data_path: Path | str) -> bool:
+    return (Path(data_path) / CONFIG_FILENAME).exists()
+
+
+def create_default_config(
+    data_path: str,
+    project_name: str,
+    user_name: str,
+    embedding_model: str,
+) -> Config:
+    return Config(
+        data_path=data_path,
+        project_name=project_name,
+        user_name=user_name,
+        db_path="analyzer.db",
+        hoplite_db_path="hoplite",
+        embedding_model=embedding_model,
+        xenocanto_api_key="",
+        **DEFAULT_DIRS,
+    )
 
 
 def initialize_directory(
@@ -15,13 +41,27 @@ def initialize_directory(
     user_name: str,
     embedding_model: str,
 ):
-    # first initialize the config
-    if (data_path / "config.yaml").exists():
-        config = Config.load(str(data_path))
+    """Create (or open) a project at `data_path`.
+
+    Safe to re-run: an existing config and hoplite database are reused rather
+    than overwritten.
+    """
+    from perch_hoplite.db import sqlite_usearch_impl
+    from perch_hoplite.zoo import model_configs
+
+    from perch_analyzer.db.db import AnalyzerDB
+
+    data_path = Path(data_path).expanduser().resolve()
+
+    if check_initialized(data_path):
+        config = Config.load(data_path)
+        config.data_path = str(data_path)
+        logger.info("reusing existing project at %s", data_path)
     else:
         if not project_name or not user_name or not embedding_model:
             raise ValueError(
-                "project_name and user_name must be provided if a project does not exist"
+                "project_name, user_name and embedding_model must be provided "
+                "if a project does not exist"
             )
         config = create_default_config(
             str(data_path),
@@ -29,15 +69,12 @@ def initialize_directory(
             user_name=user_name,
             embedding_model=embedding_model,
         )
-
         data_path.mkdir(exist_ok=True, parents=True)
         config.to_file()
 
-    # now initialize the databases
-    if (data_path / config.hoplite_db_path).exists():
-        hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
-            str(data_path / config.hoplite_db_path)
-        )
+    hoplite_path = data_path / config.hoplite_db_path
+    if hoplite_path.exists():
+        hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(str(hoplite_path))
     else:
         if not embedding_model:
             raise ValueError(
@@ -45,37 +82,13 @@ def initialize_directory(
             )
         embed_dim = model_configs.get_preset_model_config(embedding_model).embedding_dim
         hoplite_db = sqlite_usearch_impl.SQLiteUSearchDB.create(
-            str(data_path / config.hoplite_db_path),
+            str(hoplite_path),
             sqlite_usearch_impl.get_default_usearch_config(embed_dim),
         )
 
     analyzer_db = AnalyzerDB(config)
 
-    # create all of the directories
-    (data_path / config.classifier_outputs_dir).mkdir(exist_ok=True, parents=True)
-    (data_path / config.classifiers_dir).mkdir(exist_ok=True, parents=True)
-    (data_path / config.precomputed_windows_dir).mkdir(exist_ok=True, parents=True)
-    (data_path / config.target_recordings_dir).mkdir(exist_ok=True, parents=True)
+    for dir_key in DEFAULT_DIRS:
+        (data_path / getattr(config, dir_key)).mkdir(exist_ok=True, parents=True)
 
     return analyzer_db, hoplite_db
-
-
-def create_default_config(
-    data_path: str,
-    project_name: str,
-    user_name: str,
-    embedding_model: str,
-):
-    return Config(
-        data_path=data_path,
-        project_name=project_name,
-        user_name=user_name,
-        classifiers_dir="classifiers",
-        classifier_outputs_dir="classifier_outputs",
-        precomputed_windows_dir="precomputed_windows",
-        target_recordings_dir="target_recordings",
-        db_path="analyzer.db",
-        hoplite_db_path="hoplite",
-        embedding_model=embedding_model,
-        xenocanto_api_key="test",
-    )

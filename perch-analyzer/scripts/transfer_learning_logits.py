@@ -1,9 +1,10 @@
-import polars as pl
 from pathlib import Path
+
+import polars as pl
 
 WORK_DIR = Path("data/baseline_test")
 
-with open(WORK_DIR / "annotated_window_ids.txt", "r") as f:
+with open(WORK_DIR / "annotated_window_ids.txt") as f:
     ann_window_ids = []
     for line in f.readlines():
         ann_window_ids.append(int(line))

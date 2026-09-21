@@ -1,10 +1,11 @@
-from perch_hoplite.db import sqlite_usearch_impl
-from tqdm import tqdm
-from pathlib import Path
-import numpy as np
 from dataclasses import dataclass
-from sklearn.manifold import TSNE
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
+from perch_hoplite.db import sqlite_usearch_impl
+from sklearn.manifold import TSNE
+from tqdm import tqdm
 
 desired_labels = {
     "westan_song",
@@ -33,7 +34,7 @@ WORK_DIR = Path("data/baseline_test")
 WORK_DIR.mkdir(exist_ok=True, parents=True)
 
 
-with open(WORK_DIR / "annotated_window_ids.txt", "r") as f:
+with open(WORK_DIR / "annotated_window_ids.txt") as f:
     annotated_window_ids = []
     for line in f.readlines():
         annotated_window_ids.append(int(line))

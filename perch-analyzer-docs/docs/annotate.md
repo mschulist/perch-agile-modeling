@@ -18,6 +18,13 @@ To start the GUI, run the following command:
 perch-analyzer gui --data_dir=<data-directory>
 ```
 - `data_dir` is the directory used to [setup](setup) a project.
+- `--port` is the port to serve on. Defaults to 8000.
+- `--host` is the address to bind to. Defaults to `127.0.0.1`; pass `0.0.0.0` to
+  reach the GUI from another machine.
+- `--no-browser` stops a browser window from opening automatically.
+
+The GUI is served from the same process on a single port, and there is nothing
+to build or install the first time you run it.
 
 Then navigate to the `Annotate` tab. The next [possible example](terminology) will appear, and you can add labels to the window. Make sure to add all vocalizing species!
 

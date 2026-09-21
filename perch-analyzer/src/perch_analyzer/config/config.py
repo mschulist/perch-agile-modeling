@@ -1,5 +1,9 @@
-from pydantic import BaseModel
+from pathlib import Path
+
 import yaml
+from pydantic import BaseModel
+
+CONFIG_FILENAME = "config.yaml"
 
 
 class Config(BaseModel):
@@ -15,13 +19,11 @@ class Config(BaseModel):
     embedding_model: str
     xenocanto_api_key: str
 
-    def to_file(self):
-        with open(f"{self.data_path}/config.yaml", "w") as f:
-            yaml.dump(self.model_dump(), f, sort_keys=True, indent=4)
+    def to_file(self) -> None:
+        with open(Path(self.data_path) / CONFIG_FILENAME, "w") as f:
+            yaml.safe_dump(self.model_dump(), f, sort_keys=True, indent=4)
 
     @classmethod
-    def load(cls, data_path: str):
-        with open(f"{data_path}/config.yaml", "r") as f:
-            data = yaml.safe_load(f)
-
-        return cls(**data)
+    def load(cls, data_path: str | Path) -> "Config":
+        with open(Path(data_path) / CONFIG_FILENAME) as f:
+            return cls(**yaml.safe_load(f))
