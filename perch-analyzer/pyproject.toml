@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-perch-hoplite = { git = "https://github.com/google-research/perch-hoplite.git", rev = "653fa02eb48b25707a97944669483f075af9a765" }
+perch-hoplite = { git = "https://github.com/google-research/perch-hoplite.git", rev = "81ea84238bf03b5ab3358b87fec5ceb6fbf1b074" }
 
 [dependency-groups]
 dev = [
