@@ -151,6 +151,9 @@ def handle_gather_classifier_outputs(ctx: AppContext, args: argparse.Namespace) 
         max_logit=args.max_logit,
         label=args.label,
         num_windows=args.num_windows,
+        filename=args.filename,
+        min_offset=args.min_offset,
+        max_offset=args.max_offset,
     )
     report(f"successfully gathered {gathered} window(s)")
 
@@ -235,6 +238,24 @@ def gather_classifier_outputs_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max_logit", type=float, required=True)
     parser.add_argument("--label", type=str, required=True)
     parser.add_argument("--num_windows", type=int, default=1)
+    parser.add_argument(
+        "--filename",
+        type=str,
+        default=None,
+        help="only gather windows from this recording (exact match)",
+    )
+    parser.add_argument(
+        "--min_offset",
+        type=float,
+        default=None,
+        help="only gather windows starting at or after this many seconds",
+    )
+    parser.add_argument(
+        "--max_offset",
+        type=float,
+        default=None,
+        help="only gather windows starting at or before this many seconds",
+    )
 
 
 COMMANDS: tuple[Command, ...] = (
