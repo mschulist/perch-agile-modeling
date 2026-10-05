@@ -59,7 +59,10 @@ perch-analyzer gather_classifier_outputs \
     --min_logit <min-logit> \
     --max_logit <max_logit> \
     --classifier_output_id <classifier-output-id> \
-    --num_windows <number-of-windows>
+    --num_windows <number-of-windows> \
+    [--filename <recording-filename>] \
+    [--min_offset <seconds>] \
+    [--max_offset <seconds>]
 ```
 
 - `data_dir` is the directory used to [setup](setup) a project. 
@@ -68,6 +71,9 @@ perch-analyzer gather_classifier_outputs \
 - `max_logit` is the maximum logit you want to filter the classifier outputs by.
 - `classifier_output_id` is the id of the classifier output, which can be found by clicking on a classifier in the `Classifiers` tab in the GUI.
 - `num_windows` is the maximum number of windows to sample. Defaults to 1.
+- `filename` (optional) only samples windows from this recording. It must match the recording's filename exactly, as stored in the project.
+- `min_offset` (optional) only samples windows that start at or after this many seconds into the recording.
+- `max_offset` (optional) only samples windows that start at or before this many seconds into the recording. Set `min_offset` and `max_offset` to the same value to pick the window starting at that offset.
 
 This command samples windows from the classifier output within the specified logit range, allowing you to review and validate the classifier's predictions for a particular label. After gathering classifier outputs, they will appear in the GUI under the corresponding classifier outputs page. 
 

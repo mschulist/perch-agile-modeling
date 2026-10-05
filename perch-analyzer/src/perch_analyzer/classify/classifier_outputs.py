@@ -16,20 +16,34 @@ def gather_classifier_output_windows(
     max_logit: float,
     label: str,
     num_windows: int,
+    filename: str | None = None,
+    min_offset: float | None = None,
+    max_offset: float | None = None,
 ) -> int:
     """Store up to `num_windows` windows scoring in (min_logit, max_logit).
+
+    Optionally restrict to windows from the recording `filename` and whose
+    start offset (in seconds) lies in [min_offset, max_offset].
 
     Returns the number of newly stored windows.
     """
     classifier_output = analyzer_db.get_classifier_output(classifier_output_id)
 
+    filters = [
+        pl.col("label") == label,
+        pl.col("logit") > min_logit,
+        pl.col("logit") < max_logit,
+    ]
+    if filename is not None:
+        filters.append(pl.col("filename") == filename)
+    if min_offset is not None:
+        filters.append(pl.col("timestamp_s") >= min_offset)
+    if max_offset is not None:
+        filters.append(pl.col("timestamp_s") <= max_offset)
+
     windows = (
         pl.scan_parquet(classifier_output.parquet_path)
-        .filter(
-            pl.col("label") == label,
-            pl.col("logit") > min_logit,
-            pl.col("logit") < max_logit,
-        )
+        .filter(*filters)
         .limit(num_windows)
         .collect()
     )
