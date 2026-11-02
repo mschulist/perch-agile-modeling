@@ -8,9 +8,8 @@ After annotating a sufficient number of windows, you can create a custom classif
 
 ## Creating a classifier
 
-Training is the one step that is only available from the command line. It
-needs TensorFlow and benefits from a GPU. To create a custom classifier, run
-the following command: 
+Training and running classifiers are only available from the command line. To
+create a custom classifier, run the following command: 
 
 ```bash
 perch-analyzer create_classifier \
@@ -35,12 +34,7 @@ This generates a classifier, which you can run on your ARU data using the method
 
 ## Running a classifier
 
-In the GUI, open the classifier from the `Classifiers` tab and press **Run
-classifier**. When the job finishes, the new classifier output appears in the
-list below it. The run is also listed on the `Jobs` tab, where you can follow
-its progress or cancel it.
-
-From the command line, run the following command. Note that the classifier id can be found in the GUI under the `Classifiers` tab.
+After creating a classifier, you can run a classifier on your data using the following command. Note that the classifier id can be found in the GUI under the `Classifiers` tab.
 
 ```bash
 perch-analyzer run_classifier \

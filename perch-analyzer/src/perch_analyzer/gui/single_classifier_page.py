@@ -6,9 +6,7 @@ from perch_analyzer.db import db
 from perch_analyzer.gui.background import load
 from perch_analyzer.gui.classifiers_page import metrics_row
 from perch_analyzer.gui.components import loading, page_layout, wait_for_client
-from perch_analyzer.gui.job_forms import JobForm
 from perch_analyzer.gui.services import ProjectServices, project
-from perch_analyzer.jobs import Job, JobStatus
 
 
 def _load(
@@ -69,38 +67,10 @@ async def single_classifier_page(classifier_id: int) -> None:
 
         ui.separator()
         ui.label("Classifier Outputs").classes("text-2xl font-bold")
-
-        async def refresh_outputs(job: Job) -> None:
-            if job.status is not JobStatus.SUCCEEDED:
-                return
-            _, fresh = await load(_load, services, classifier_id)
-            _render_outputs(outputs_slot, fresh)
-
-        with ui.card().classes("w-full gap-2"):
-            ui.label("Run this classifier over every window").classes(
-                "text-lg font-semibold"
-            )
-            ui.label(
-                "Scores every embedded window and saves the result as a new "
-                "classifier output. On a large project this takes a while."
-            ).classes("text-sm text-gray-500")
-            # Outside the list it refreshes, so the refresh never deletes the
-            # form whose timer is running.
-            JobForm(
-                "run_classifier",
-                fixed={"classifier_id": classifier_id},
-                submit_label="Run classifier",
-                on_finished=refresh_outputs,
-            )
-        outputs_slot = ui.column().classes("w-full gap-3")
-        _render_outputs(outputs_slot, outputs)
-
-
-def _render_outputs(slot: ui.column, outputs: list[db.ClassifierOutput]) -> None:
-    slot.clear()
-    with slot:
         if not outputs:
-            ui.label("No runs yet.").classes("italic text-gray-500")
+            ui.label(
+                "No runs yet. Use `perch-analyzer run_classifier` to make one."
+            ).classes("italic text-gray-500")
         for output in outputs:
             with (
                 ui.card()

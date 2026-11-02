@@ -162,9 +162,9 @@ node toolchain — that is the point, so keep it that way.
 ### Jobs: which commands the GUI may start
 
 Commands with `gui=True` in `cli.COMMANDS` (`target_recordings`, `search`,
-`run_classifier`, `gather_classifier_outputs`) can be started from the GUI.
-`embed` and `create_classifier` stay CLI-only because they want a GPU and
-careful tuning. Don't flip them without asking.
+`gather_classifier_outputs`) can be started from the GUI. `embed`,
+`create_classifier` and `run_classifier` stay CLI-only by design. Don't flip
+them without asking.
 
 - `JobManager` runs `python -m perch_analyzer <cmd>` as a subprocess, so heavy
   imports and models never load into the GUI process. Status and output are
@@ -194,7 +194,7 @@ every GUI bug found so far has been in a handler, not in a first render.
 Commands that need the 779 MB perch_v2 download or the Xeno-canto API
 (`embed`, `search`, `target_recordings`) are not covered; verify those by hand.
 `tests/test_jobs.py` and the job tests in `test_gui_interactions.py` run
-`gather_classifier_outputs` and `run_classifier` for real, as subprocesses,
+`gather_classifier_outputs` for real, as subprocesses,
 against the fixture project, which includes a small classifier output parquet.
 
 The `gui` fixture signs in as `conftest.TEST_USERNAME`. Use

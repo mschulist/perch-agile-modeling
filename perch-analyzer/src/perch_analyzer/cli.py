@@ -37,8 +37,8 @@ class Command:
     add_arguments: ArgumentAdder = field(default=lambda parser: None)
     # `init` is the only command that may run against an empty directory.
     requires_project: bool = True
-    # Whether the GUI's Jobs page offers this command. Commands that need a
-    # GPU or careful tuning (`embed`, `create_classifier`) stay CLI-only.
+    # Whether the GUI's Jobs page offers this command. `embed`,
+    # `create_classifier` and `run_classifier` stay CLI-only.
     gui: bool = False
 
 
@@ -379,7 +379,6 @@ COMMANDS: tuple[Command, ...] = (
         help="Run a custom classifier on the data",
         handler=handle_run_classifier,
         add_arguments=run_classifier_args,
-        gui=True,
     ),
     Command(
         name="set_xc_api_key",

@@ -1,7 +1,7 @@
 """Launch CLI commands and follow their progress.
 
-`embed` and `create_classifier` are deliberately absent: they want a GPU and
-careful tuning, and stay on the command line. Everything with `gui=True` in
+`embed`, `create_classifier` and `run_classifier` are deliberately absent and
+stay on the command line. Everything with `gui=True` in
 `cli.COMMANDS` gets a form here.
 """
 
@@ -45,7 +45,6 @@ COLUMNS = [
 class FormChoices:
     """Existing ids and labels to offer in the forms, read once per page load."""
 
-    classifier_ids: list[int] = field(default_factory=list)
     classifier_output_ids: list[int] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
     unfinished_target_recordings: int = 0
@@ -59,7 +58,6 @@ def _load_choices(analyzer_db: AnalyzerDB) -> FormChoices:
         for output in analyzer_db.get_all_classifier_outputs(classifier.id)
     ]
     return FormChoices(
-        classifier_ids=[classifier.id for classifier in classifiers],
         classifier_output_ids=sorted(output_ids),
         labels=sorted({label for c in classifiers for label in c.labels}),
         unfinished_target_recordings=analyzer_db.count_target_recordings(False),
@@ -86,8 +84,8 @@ class JobsView:
     async def build(self) -> None:
         with page_layout("Jobs"):
             ui.label(
-                "Run project commands in the background. Embedding and training "
-                "classifiers stay on the command line."
+                "Run project commands in the background. Embedding, training "
+                "and running classifiers stay on the command line."
             ).classes("text-sm text-gray-500")
             with ui.row().classes("w-full gap-6 items-start no-wrap"):
                 with ui.column().classes("w-[560px] shrink-0 gap-3"):
@@ -129,7 +127,6 @@ class JobsView:
 
     def _build_forms(self, choices: FormChoices) -> None:
         options: dict[str, dict[str, list[object]]] = {
-            "run_classifier": {"classifier_id": list(choices.classifier_ids)},
             "gather_classifier_outputs": {
                 "classifier_output_id": list(choices.classifier_output_ids),
                 "label": list(choices.labels),

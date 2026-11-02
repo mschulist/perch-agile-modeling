@@ -38,11 +38,10 @@ def test_add_user_twice_fails(project_dir: Path):
         run(project_dir, "add_user", f"--username={TEST_USERNAME}", "--password=x")
 
 
-def test_gui_commands_are_the_cpu_friendly_ones():
+def test_gui_commands():
     assert [c.name for c in cli.gui_commands()] == [
         "target_recordings",
         "search",
-        "run_classifier",
         "gather_classifier_outputs",
     ]
 
@@ -54,7 +53,6 @@ SAMPLE_VALUES: dict[str, dict[str, object]] = {
         "num_recordings": 2.0,
     },
     "search": {"num_per_target_recording": 7},
-    "run_classifier": {"classifier_id": 1},
     "gather_classifier_outputs": {
         "classifier_output_id": 1,
         "min_logit": -2.5,

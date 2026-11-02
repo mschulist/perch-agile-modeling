@@ -87,8 +87,9 @@ async def test_bad_arguments_never_start_a_process(project_dir: Path):
     manager = JobManager(project_dir)
     with pytest.raises(cli.ArgumentError):
         await manager.start("gather_classifier_outputs", {"label": "x"}, "ana")
-    with pytest.raises(ValueError, match="cannot be run from the GUI"):
-        await manager.start("embed", {}, "ana")
+    for cli_only in ("embed", "create_classifier", "run_classifier"):
+        with pytest.raises(ValueError, match="cannot be run from the GUI"):
+            await manager.start(cli_only, {}, "ana")
     assert manager.recent() == []
 
 

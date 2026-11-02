@@ -198,12 +198,11 @@ async def test_jobs_page_offers_only_gui_commands(gui: User):
     for command in (
         "target_recordings",
         "search",
-        "run_classifier",
         "gather_classifier_outputs",
     ):
         await gui.should_see(marker=f"form_{command}")
-    await gui.should_not_see(marker="form_embed")
-    await gui.should_not_see(marker="form_create_classifier")
+    for cli_only in ("embed", "create_classifier", "run_classifier"):
+        await gui.should_not_see(marker=f"form_{cli_only}")
 
 
 async def test_jobs_page_runs_a_job_and_shows_its_log(gui: User, ctx: AppContext):
@@ -228,8 +227,8 @@ async def test_jobs_page_runs_a_job_and_shows_its_log(gui: User, ctx: AppContext
 
 async def test_form_errors_are_shown_without_starting_a_job(gui: User):
     await gui.open("/jobs")
-    await gui.should_see(marker="form_run_classifier")
-    gui.find(marker="start_run_classifier").click()
+    await gui.should_see(marker="form_gather_classifier_outputs")
+    gui.find(marker="start_gather_classifier_outputs").click()
     await gui.should_see("Check the form")
 
 
@@ -251,11 +250,8 @@ async def test_gather_from_the_classifier_output_page(gui: User):
     await gui.should_see("highest logit first")
 
 
-async def test_run_classifier_from_its_page(gui: User, ctx: AppContext):
+async def test_classifier_page_has_no_run_button(gui: User):
+    """Running a classifier is CLI-only."""
     await gui.open("/single_classifier/1")
-    await gui.should_see("Run this classifier over every window")
-    gui.find(marker="start_run_classifier").click()
-
-    await gui.should_see("Job #1 finished.", retries=JOB_RETRIES)
-    await gui.should_see("Classifier Output Id: 2")
-    assert [o.id for o in ctx.analyzer_db.get_all_classifier_outputs(1)] == [1, 2]
+    await gui.should_see("Classifier Output Id: 1")
+    await gui.should_not_see(marker="start_run_classifier")
