@@ -4,14 +4,20 @@ from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, event, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import perch_analyzer.db.tables as tables
+from perch_analyzer import auth
 from perch_analyzer.classify.linear_model import LinearClassifier
 from perch_analyzer.config import config
 
 SAMPLE_RATE = 32000
+
+# How long a connection waits on another process's write lock before giving
+# up. GUI threads and job subprocesses now write to analyzer.db concurrently.
+BUSY_TIMEOUT_MS = 10_000
 
 
 def linear_classifier_path(classifiers_dir: str, classifier_id: int):
@@ -85,10 +91,24 @@ class TargetRecording(BaseModel):
     audio: np.ndarray
 
 
+class UserInfo(BaseModel):
+    id: int
+    username: str
+    created_at: dt
+
+
+def _set_busy_timeout(dbapi_connection: Any, _record: Any) -> None:
+    # Per connection, so this changes neither the file nor the schema.
+    cursor = dbapi_connection.cursor()
+    cursor.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+    cursor.close()
+
+
 class AnalyzerDB:
     def __init__(self, config: config.Config):
         self.config = config
         self.engine = create_engine(f"sqlite:///{config.data_path}/{config.db_path}")
+        event.listen(self.engine, "connect", _set_busy_timeout)
         tables.Base.metadata.create_all(self.engine)
 
     # --- Paths -------------------------------------------------------------
@@ -444,3 +464,75 @@ class AnalyzerDB:
                 == classifier_output_id
             )
             return {(row.window_id, row.label) for row in session.execute(stmt)}
+
+    # --- Users ---------------------------------------------------------------
+
+    def create_user(self, username: str, password: str) -> int:
+        """Create a login. Raises `ValueError` if the name is taken or invalid."""
+        name = auth.normalize_username(username)
+        password_hash = auth.hash_password(auth.validate_password(password))
+        with Session(self.engine) as session:
+            row = tables.User(
+                username=name,
+                password_hash=password_hash,
+                created_at=dt.now().isoformat(timespec="seconds"),
+            )
+            session.add(row)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                raise ValueError(f"user {name!r} already exists") from exc
+            return row.id
+
+    def _get_user_row(self, session: Session, username: str) -> tables.User | None:
+        stmt = select(tables.User).where(tables.User.username == username.strip())
+        return session.execute(stmt).scalar_one_or_none()
+
+    def user_exists(self, username: str) -> bool:
+        with Session(self.engine) as session:
+            return self._get_user_row(session, username) is not None
+
+    def verify_user(self, username: str, password: str) -> bool:
+        with Session(self.engine) as session:
+            row = self._get_user_row(session, username)
+            if row is None:
+                return False
+            return auth.check_password(password, row.password_hash)
+
+    def set_password(self, username: str, password: str) -> None:
+        """Replace a user's password. Raises `KeyError` if there is no such user."""
+        password_hash = auth.hash_password(auth.validate_password(password))
+        with Session(self.engine) as session:
+            row = self._get_user_row(session, username)
+            if row is None:
+                raise KeyError(f"no user named {username!r}")
+            row.password_hash = password_hash
+            session.commit()
+
+    def delete_user(self, username: str) -> None:
+        """Remove a login. Raises `KeyError` if there is no such user."""
+        with Session(self.engine) as session:
+            row = self._get_user_row(session, username)
+            if row is None:
+                raise KeyError(f"no user named {username!r}")
+            session.delete(row)
+            session.commit()
+
+    def list_users(self) -> list[UserInfo]:
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(tables.User).order_by(tables.User.username)
+            ).scalars()
+            return [
+                UserInfo(
+                    id=row.id,
+                    username=row.username,
+                    created_at=dt.fromisoformat(row.created_at),
+                )
+                for row in rows
+            ]
+
+    def count_users(self) -> int:
+        with Session(self.engine) as session:
+            stmt = select(func.count()).select_from(tables.User)
+            return session.execute(stmt).scalar_one()

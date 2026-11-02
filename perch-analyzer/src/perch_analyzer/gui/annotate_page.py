@@ -17,6 +17,7 @@ from perch_analyzer.gui.components import (
     window_media,
 )
 from perch_analyzer.gui.services import ProjectServices, project
+from perch_analyzer.gui.session import require_user
 from perch_analyzer.gui.views import WindowView, build_views
 
 logger = logging.getLogger(__name__)
@@ -34,8 +35,9 @@ class NextWindow:
 
 
 class AnnotateView:
-    def __init__(self, services: ProjectServices):
+    def __init__(self, services: ProjectServices, user: str):
         self.services = services
+        self.user = user
         self.all_labels: list[str] = []
         self.current = NextWindow()
 
@@ -85,17 +87,19 @@ class AnnotateView:
             view=views[0] if views else None,
         )
 
-    def _submit(self, annotation_id: int, window_id: int, labels: list[str]) -> None:
+    def _submit(
+        self, annotation_id: int, window_id: int, labels: list[str], user: str
+    ) -> None:
         hoplite_db = self.services.hoplite_db
         # Clear the "possible example" marker whether or not it is confirmed.
         if hoplite_db.get_annotation(annotation_id):
             hoplite_db.remove_annotation(annotation_id)
         if labels:
             examine_annotations.update_labels(
-                config=self.services.config,
                 hoplite_db=hoplite_db,
                 window_id=window_id,
                 new_labels=labels,
+                provenance=user,
             )
         hoplite_db.commit()
 
@@ -128,6 +132,10 @@ class AnnotateView:
                 ui.label("All search results have been reviewed.").classes(
                     "text-gray-500"
                 )
+                with ui.row().classes("items-center gap-1 text-gray-500"):
+                    ui.label("Add target recordings and run a search from")
+                    ui.link("Jobs", "/jobs")
+                    ui.label("to find more.")
                 return
 
             ui.label(f"{current.remaining} possible example(s) left").classes(
@@ -163,10 +171,14 @@ class AnnotateView:
             return
         labels = sorted(self.select.value or [])
         await run_blocking(
-            self._submit, current.annotation_id, current.view.window_id, labels
+            self._submit,
+            current.annotation_id,
+            current.view.window_id,
+            labels,
+            self.user,
         )
         await self._load_and_render()
 
 
 async def annotate_page() -> None:
-    await AnnotateView(project()).build()
+    await AnnotateView(project(), require_user()).build()

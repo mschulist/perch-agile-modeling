@@ -28,11 +28,12 @@ def test_update_labels_adds_and_removes(ctx: AppContext):
     assert 1 in before
 
     examine_annotations.update_labels(
-        config=ctx.config, hoplite_db=hoplite_db, window_id=1, new_labels=["rebnut"]
+        hoplite_db=hoplite_db, window_id=1, new_labels=["rebnut"], provenance="ana"
     )
 
     windows = examine_annotations.get_windows_with_annotations(hoplite_db, [1])
     assert [a.label for a in windows[0].annotations] == ["rebnut"]
+    assert [a.provenance for a in windows[0].annotations] == ["ana"]
 
     after = examine_annotations.get_window_ids_by_label(hoplite_db, "stejay")
     assert after == [wid for wid in before if wid != 1]

@@ -26,6 +26,9 @@ perch-analyzer gui --data_dir=<data-directory>
 The GUI is served from the same process on a single port, and there is nothing
 to build or install the first time you run it.
 
+Sign in with an account created by `perch-analyzer add_user` (see
+[Logins](setup#logins)). Labels you add are recorded under your username.
+
 Then navigate to the `Annotate` tab. The next [possible example](terminology) will appear, and you can add labels to the window. Make sure to add all vocalizing species!
 
 ## Examining Previous Annotations

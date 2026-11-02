@@ -15,8 +15,11 @@ from perch_analyzer.gui.components import (
     page_layout,
     wait_for_client,
 )
+from perch_analyzer.gui.job_forms import JobForm
 from perch_analyzer.gui.services import ProjectServices, project
+from perch_analyzer.gui.session import require_user
 from perch_analyzer.gui.views import WindowView, build_views
+from perch_analyzer.jobs import Job, JobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +33,13 @@ class ClassifierOutputView:
     mount, including its spectrogram and audio, before a label was picked.
     """
 
-    def __init__(self, services: ProjectServices, output_id: int):
+    def __init__(self, services: ProjectServices, output_id: int, user: str):
         self.services = services
+        self.user = user
         self.output_id = output_id
         self.output_labels: list[str] = []
         self.editor_labels: list[str] = []
+        self.classifier_labels: list[str] = []
         self.selected_label: str | None = None
         self.window_ids: list[int] = []
         self.logits: dict[int, tuple[str, float]] = {}
@@ -43,8 +48,9 @@ class ClassifierOutputView:
 
     # --- Data ----------------------------------------------------------
 
-    def _load_header(self) -> tuple[str, list[str], list[str]]:
+    def _load_header(self) -> tuple[str, list[str], list[str], list[str]]:
         analyzer_db = self.services.analyzer_db
+        classifier_labels: list[str] = []
         try:
             output = analyzer_db.get_classifier_output(self.output_id)
             classifier = analyzer_db.get_classifier_info(output.classifier_id)
@@ -52,6 +58,7 @@ class ClassifierOutputView:
                 f"Classifier {classifier.id} "
                 f"({classifier.datetime.strftime('%Y-%m-%d %H:%M')})"
             )
+            classifier_labels = sorted(classifier.labels)
         except Exception:
             logger.exception("could not load classifier output %s", self.output_id)
             header = "Unknown"
@@ -61,7 +68,10 @@ class ClassifierOutputView:
             label_type=datatypes.LabelType.POSITIVE
         )
         editor_labels = sorted({*hoplite_labels, *output_labels})
-        return header, output_labels, editor_labels
+        return header, output_labels, editor_labels, classifier_labels
+
+    def _load_output_labels(self) -> list[str]:
+        return self.services.analyzer_db.get_classifier_output_labels(self.output_id)
 
     def _load_windows_for_label(
         self, label: str
@@ -77,12 +87,12 @@ class ClassifierOutputView:
     def _load_page(self, window_ids: list[int]) -> list[WindowView]:
         return build_views(self.services, window_ids, classifier_labels=self.logits)
 
-    def _save(self, window_id: int, labels: list[str]) -> None:
+    def _save(self, window_id: int, labels: list[str], user: str) -> None:
         examine_annotations.update_labels(
-            config=self.services.config,
             hoplite_db=self.services.hoplite_db,
             window_id=window_id,
             new_labels=labels,
+            provenance=user,
         )
 
     # --- UI ------------------------------------------------------------
@@ -95,6 +105,7 @@ class ClassifierOutputView:
                     ui.label("Labels").classes("text-2xl font-bold")
                     self.labels_slot = ui.column().classes("w-full")
                 with ui.column().classes("grow gap-4 min-w-0"):
+                    self.gather_slot = ui.column().classes("w-full")
                     self.heading = ui.label("Windows").classes("text-2xl font-bold")
                     self.status = ui.label("Select a label to view windows.").classes(
                         "text-sm text-gray-500"
@@ -114,7 +125,12 @@ class ClassifierOutputView:
 
         with self.labels_slot:
             spinner = loading("Loading labels...")
-        header, self.output_labels, self.editor_labels = await load(self._load_header)
+        (
+            header,
+            self.output_labels,
+            self.editor_labels,
+            self.classifier_labels,
+        ) = await load(self._load_header)
         spinner.delete()
 
         self.subtitle.text = f"Classifier: {header}"
@@ -122,9 +138,41 @@ class ClassifierOutputView:
             self.label_list = SearchableList(self.output_labels, self._on_select_label)
         if not self.output_labels:
             self.status.text = (
-                "No gathered windows yet. Use "
-                "`perch-analyzer gather_classifier_outputs` to sample some."
+                "No gathered windows yet. Gather some above to review them."
             )
+        self._build_gather_form()
+
+    def _build_gather_form(self) -> None:
+        with (
+            self.gather_slot,
+            ui.expansion(
+                "Gather more windows",
+                caption="Sample windows by label and logit range",
+                value=not self.output_labels,
+            )
+            .classes("w-full border rounded")
+            .mark("gather"),
+            ui.column().classes("w-full gap-2 p-2"),
+        ):
+            JobForm(
+                "gather_classifier_outputs",
+                fixed={"classifier_output_id": self.output_id},
+                options={"label": self.classifier_labels},
+                submit_label="Gather windows",
+                on_finished=self._on_gathered,
+            )
+
+    async def _on_gathered(self, job: Job) -> None:
+        if job.status is not JobStatus.SUCCEEDED:
+            return
+        self.output_labels = await load(self._load_output_labels)
+        # Restyle in place: the list holds no handler that is running now.
+        self.label_list.set_items(self.output_labels)
+        self.label_list.set_selected(self.selected_label)
+        if self.selected_label is not None:
+            await self._on_select_label(self.selected_label)
+        elif self.output_labels:
+            self.status.text = "Select a label to view windows."
 
     async def _on_select_label(self, label: str) -> None:
         self.selected_label = label
@@ -189,7 +237,7 @@ class ClassifierOutputView:
         await self._render_page()
 
     async def _on_save(self, window_id: int, labels: list[str]) -> None:
-        await run_blocking(self._save, window_id, labels)
+        await run_blocking(self._save, window_id, labels, self.user)
         ui.notify("Saved labels", type="positive")
         for label in labels:
             if label not in self.editor_labels:
@@ -198,4 +246,4 @@ class ClassifierOutputView:
 
 
 async def classifier_output_page(output_id: int) -> None:
-    await ClassifierOutputView(project(), output_id).build()
+    await ClassifierOutputView(project(), output_id, require_user()).build()

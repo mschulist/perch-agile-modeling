@@ -24,7 +24,13 @@ In addition to gathering target recordings from Xeno-canto, you can also import 
 
 ## Usage
 
-To gather target recordings from Xeno-canto, you first need to obtain a Xeno-canto API key from https://xeno-canto.org/explore/api (they key is on your account page). To set your Xeno-canto API key, use the following command:
+To gather target recordings from Xeno-canto, you first need to obtain a Xeno-canto API key from https://xeno-canto.org/explore/api (they key is on your account page).
+
+In the GUI, paste the key into the `Configuration` tab and save. Then open the
+`Jobs` tab, expand **Gather target recordings**, fill in the eBird code, call
+type and number of recordings, and press **Start**.
+
+To set your Xeno-canto API key from the command line instead, use the following command:
 
 ```bash
 perch-analyzer set_xc_api_key \

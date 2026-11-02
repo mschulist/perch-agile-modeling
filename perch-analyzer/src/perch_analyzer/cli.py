@@ -3,14 +3,22 @@
 Each subcommand is a `Command` entry in `COMMANDS`. Handlers import their
 implementation module lazily so that, for example, `perch-analyzer init` never
 pays for JAX, polars or TensorFlow.
+
+Commands marked `gui=True` can also be launched from the GUI's Jobs page. The
+GUI builds its forms from the same argparse definitions (`command_arguments`)
+and turns the filled-in form back into a command line (`to_argv`), which runs
+as a subprocess. There is one definition of every flag, here.
 """
 
 import argparse
+import getpass
 import logging
+import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NoReturn, override
 
 from perch_analyzer.app_context import AppContext, ProjectNotInitializedError
 from perch_analyzer.logging_config import setup_logging
@@ -29,6 +37,9 @@ class Command:
     add_arguments: ArgumentAdder = field(default=lambda parser: None)
     # `init` is the only command that may run against an empty directory.
     requires_project: bool = True
+    # Whether the GUI's Jobs page offers this command. Commands that need a
+    # GPU or careful tuning (`embed`, `create_classifier`) stay CLI-only.
+    gui: bool = False
 
 
 def report(message: str) -> None:
@@ -52,6 +63,13 @@ def handle_init(ctx: AppContext, args: argparse.Namespace) -> None:
 
 
 def handle_gui(ctx: AppContext, args: argparse.Namespace) -> None:
+    from perch_analyzer.gui import settings
+
+    # NiceGUI reads this when it is first imported, so it must be set before
+    # `gui.app` is. Keeps login sessions inside the project, not the cwd.
+    os.environ.setdefault(
+        "NICEGUI_STORAGE_PATH", str(ctx.data_dir / settings.STORAGE_DIRNAME)
+    )
     from perch_analyzer.gui.app import launch
 
     launch(
@@ -158,6 +176,47 @@ def handle_gather_classifier_outputs(ctx: AppContext, args: argparse.Namespace) 
     report(f"successfully gathered {gathered} window(s)")
 
 
+def _read_password(args: argparse.Namespace) -> str:
+    if args.password is not None:
+        return args.password
+    password = getpass.getpass("Password: ")
+    if password != getpass.getpass("Repeat password: "):
+        raise SystemExit("error: passwords do not match")
+    return password
+
+
+def handle_add_user(ctx: AppContext, args: argparse.Namespace) -> None:
+    try:
+        ctx.analyzer_db.create_user(args.username, _read_password(args))
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from exc
+    report(f"created user {args.username.strip()!r}")
+
+
+def handle_set_password(ctx: AppContext, args: argparse.Namespace) -> None:
+    try:
+        ctx.analyzer_db.set_password(args.username, _read_password(args))
+    except (KeyError, ValueError) as exc:
+        raise SystemExit(f"error: {exc.args[0]}") from exc
+    report(f"updated the password for {args.username.strip()!r}")
+
+
+def handle_remove_user(ctx: AppContext, args: argparse.Namespace) -> None:
+    try:
+        ctx.analyzer_db.delete_user(args.username)
+    except KeyError as exc:
+        raise SystemExit(f"error: {exc.args[0]}") from exc
+    report(f"removed user {args.username.strip()!r}")
+
+
+def handle_list_users(ctx: AppContext, args: argparse.Namespace) -> None:
+    users = ctx.analyzer_db.list_users()
+    if not users:
+        print("no users yet; create one with `perch-analyzer add_user`")
+    for user in users:
+        print(f"{user.username}\t(created {user.created_at:%Y-%m-%d %H:%M})")
+
+
 # --- Argument definitions --------------------------------------------------
 
 
@@ -168,7 +227,9 @@ def init_args(parser: argparse.ArgumentParser) -> None:
 
 
 def gui_args(parser: argparse.ArgumentParser) -> None:
-    from perch_analyzer.gui import app as gui_app
+    # `gui.settings` rather than `gui.app`: importing NiceGUI here would slow
+    # down building the parser for every command.
+    from perch_analyzer.gui import settings as gui_settings
 
     parser.add_argument(
         "--host", type=str, default="127.0.0.1", help="Address to bind to."
@@ -182,7 +243,7 @@ def gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--page_timeout",
         type=float,
-        default=gui_app.DEFAULT_RESPONSE_TIMEOUT,
+        default=gui_settings.DEFAULT_RESPONSE_TIMEOUT,
         help=(
             "Seconds a page may take to build before the browser gives up. "
             "Raise it if rendering spectrograms for a large project times out."
@@ -191,7 +252,7 @@ def gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--reconnect_timeout",
         type=float,
-        default=gui_app.DEFAULT_RECONNECT_TIMEOUT,
+        default=gui_settings.DEFAULT_RECONNECT_TIMEOUT,
         help="Seconds the server keeps a disconnected browser's state alive.",
     )
 
@@ -207,7 +268,8 @@ def target_recordings_args(parser: argparse.ArgumentParser) -> None:
         "--call_type",
         type=str,
         required=True,
-        help="call type to search for, one of (song, call)",
+        choices=("song", "call"),
+        help="call type to search for",
     )
     parser.add_argument("--num_recordings", type=int, default=1)
 
@@ -230,6 +292,20 @@ def run_classifier_args(parser: argparse.ArgumentParser) -> None:
 
 def set_xc_api_key_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--xc_api_key", type=str, required=True)
+
+
+def username_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--username", type=str, required=True)
+
+
+def username_password_args(parser: argparse.ArgumentParser) -> None:
+    username_args(parser)
+    parser.add_argument(
+        "--password",
+        type=str,
+        default=None,
+        help="prompted for if omitted, which keeps it out of your shell history",
+    )
 
 
 def gather_classifier_outputs_args(parser: argparse.ArgumentParser) -> None:
@@ -283,12 +359,14 @@ COMMANDS: tuple[Command, ...] = (
         help="Gather target recordings",
         handler=handle_target_recordings,
         add_arguments=target_recordings_args,
+        gui=True,
     ),
     Command(
         name="search",
         help="Search recordings",
         handler=handle_search,
         add_arguments=search_args,
+        gui=True,
     ),
     Command(
         name="create_classifier",
@@ -301,6 +379,7 @@ COMMANDS: tuple[Command, ...] = (
         help="Run a custom classifier on the data",
         handler=handle_run_classifier,
         add_arguments=run_classifier_args,
+        gui=True,
     ),
     Command(
         name="set_xc_api_key",
@@ -316,8 +395,121 @@ COMMANDS: tuple[Command, ...] = (
         ),
         handler=handle_gather_classifier_outputs,
         add_arguments=gather_classifier_outputs_args,
+        gui=True,
+    ),
+    Command(
+        name="add_user",
+        help="Create a GUI login",
+        handler=handle_add_user,
+        add_arguments=username_password_args,
+    ),
+    Command(
+        name="set_password",
+        help="Change a GUI login's password",
+        handler=handle_set_password,
+        add_arguments=username_password_args,
+    ),
+    Command(
+        name="remove_user",
+        help="Delete a GUI login (their annotations are kept)",
+        handler=handle_remove_user,
+        add_arguments=username_args,
+    ),
+    Command(
+        name="list_users",
+        help="List GUI logins",
+        handler=handle_list_users,
     ),
 )
+
+
+# --- Running commands from the GUI -----------------------------------------
+
+
+def get_command(name: str) -> Command:
+    for command in COMMANDS:
+        if command.name == name:
+            return command
+    raise KeyError(f"unknown command {name!r}")
+
+
+def gui_commands() -> tuple[Command, ...]:
+    """The commands the GUI may launch."""
+    return tuple(command for command in COMMANDS if command.gui)
+
+
+class ArgumentError(ValueError):
+    """A command's arguments did not parse."""
+
+
+class _RaisingParser(argparse.ArgumentParser):
+    """A parser that raises instead of printing usage and exiting."""
+
+    @override
+    def error(self, message: str) -> NoReturn:
+        raise ArgumentError(message)
+
+
+def _command_parser(name: str) -> argparse.ArgumentParser:
+    parser = _RaisingParser(prog=f"perch-analyzer {name}", add_help=False)
+    get_command(name).add_arguments(parser)
+    return parser
+
+
+def command_arguments(name: str) -> list[argparse.Action]:
+    """The options a command takes, excluding the shared ones like --data_dir."""
+    return list(_command_parser(name)._actions)
+
+
+def _flag(action: argparse.Action) -> str:
+    return max(action.option_strings, key=len)
+
+
+def to_argv(name: str, values: Mapping[str, object]) -> list[str]:
+    """Turn {dest: value} into command line options for `name`.
+
+    `None`, empty strings and empty lists are left out, so the option falls
+    back to its default. The result is parsed before being returned, so a bad
+    value raises `ArgumentError` here rather than inside a subprocess.
+    """
+    argv: list[str] = []
+    for action in command_arguments(name):
+        value = values.get(action.dest)
+        if value is None or value == "" or value == []:
+            continue
+        flag = _flag(action)
+        if action.nargs == 0:  # store_true and friends
+            if value:
+                argv.append(flag)
+        elif action.nargs in ("*", "+"):
+            items: list[object] = (
+                list(value) if isinstance(value, (list, tuple)) else [value]
+            )
+            argv.append(flag)
+            argv.extend(str(item) for item in items)
+        else:
+            if action.type is int and isinstance(value, float) and value.is_integer():
+                # `ui.number` hands back floats even for integer fields.
+                value = int(value)
+            # `--flag=value` keeps a value that starts with "-" from being
+            # mistaken for an option.
+            argv.append(f"{flag}={value}")
+    _command_parser(name).parse_args(argv)
+    return argv
+
+
+def subprocess_argv(
+    name: str, data_dir: Path, values: Mapping[str, object]
+) -> list[str]:
+    """The full command line that runs `name` in a fresh Python process."""
+    return [
+        sys.executable,
+        "-m",
+        "perch_analyzer",
+        name,
+        f"--data_dir={data_dir}",
+        *to_argv(name, values),
+    ]
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from nicegui import context, ui
 
+from perch_analyzer.gui.session import current_user, sign_out
 from perch_analyzer.gui.views import WindowView
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -22,6 +23,7 @@ NAV_LINKS: tuple[tuple[str, str], ...] = (
     ("Annotate", "/annotate"),
     ("Examine", "/examine"),
     ("Classifiers", "/classifiers"),
+    ("Jobs", "/jobs"),
     ("Audio Summary", "/summary"),
     ("Configuration", "/config"),
 )
@@ -30,16 +32,29 @@ SaveHandler = Callable[[int, list[str]], Awaitable[None]]
 
 
 @contextmanager
-def page_layout(title: str | None = None):
-    """Render the navbar and yield a centered container for the page body."""
+def page_layout(title: str | None = None, *, show_nav: bool = True):
+    """Render the navbar and yield a centered container for the page body.
+
+    `show_nav=False` is for the login page, which has nowhere to link to yet.
+    """
     with ui.header().classes("items-center gap-6 px-6 py-3"):
         with ui.link(target="/").classes(
             "flex items-center gap-2 text-white no-underline"
         ):
             ui.image(LOGO_URL).props("tag=img").classes("h-9 w-9 object-contain")
             ui.label("Perch Analyzer").classes("text-lg font-bold")
-        for text, target in NAV_LINKS:
-            ui.link(text, target).classes("text-white no-underline hover:underline")
+        if show_nav:
+            for text, target in NAV_LINKS:
+                ui.link(text, target).classes("text-white no-underline hover:underline")
+            user = current_user()
+            if user is not None:
+                with ui.row().classes("ml-auto items-center gap-4"):
+                    ui.link(user, "/account").classes(
+                        "text-white no-underline hover:underline font-medium"
+                    ).tooltip("Account")
+                    ui.button("Log out", on_click=sign_out).props(
+                        "flat dense no-caps color=white"
+                    )
 
     with ui.column().classes("w-full max-w-[1500px] mx-auto p-6 gap-4") as container:
         if title:

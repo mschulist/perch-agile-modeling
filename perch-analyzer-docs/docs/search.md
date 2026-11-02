@@ -12,7 +12,16 @@ After searching, all target recordings will be marked as _finished_ to prevent s
 
 ## Usage
 
-To search, use the following command:
+In the GUI, open the `Jobs` tab and expand **Search recordings**. It shows how
+many unfinished target recordings will be searched. Choose
+`num_per_target_recording` and press **Start**. The job's output appears in the
+log on the right, and the possible examples it finds are ready on the
+`Annotate` tab as soon as it finishes.
+
+Search loads the embedding model in its own process, so it takes a little
+while to start and does not slow down the GUI for other annotators.
+
+From the command line, use the following command:
 
 ```bash
 perch-analyzer search \ 

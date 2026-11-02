@@ -11,32 +11,41 @@ MAX_LEN = 60
 XENO_CANTO_URL = "https://xeno-canto.org/api/3/recordings"
 
 
+# Rate limiting (429) and server errors are worth retrying; anything else, such
+# as a 404 for a malformed query, will not get better by asking again.
+MAX_ATTEMPTS = 8
+INITIAL_BACKOFF_S = 0.25
+MAX_BACKOFF_S = 8.0
+
+
+def _is_retryable(status_code: int) -> bool:
+    return status_code == 429 or status_code >= 500
+
+
 def get_xc_ids(config: config.Config, ebird_6_code: str, call_type: str) -> list[str]:
     xc_sci_name = convert_ebird_6_code_to_xc_sci_name(ebird_6_code)
 
     url = f'{XENO_CANTO_URL}?key={config.xenocanto_api_key}&query=sp:"{xc_sci_name}"+type:"{call_type}"+len:"1-{MAX_LEN}"'
 
-    # continue trying if rate limited
-    status_code = 0
     response = None
-    while status_code != 200:
+    backoff = INITIAL_BACKOFF_S
+    for attempt in range(1, MAX_ATTEMPTS + 1):
         response = httpx.get(url)
-        status_code = response.status_code
-        if status_code == 200:
-            break
-        if status_code == 401:
+        if response.status_code == 200:
+            return [rec["id"] for rec in response.json()["recordings"]]
+        if response.status_code == 401:
             raise ValueError(
                 "unauthorized xenocanto request, make sure to set your xenocanto API key"
             )
-        time.sleep(0.25)
+        if not _is_retryable(response.status_code) or attempt == MAX_ATTEMPTS:
+            break
+        time.sleep(backoff)
+        backoff = min(backoff * 2, MAX_BACKOFF_S)
 
-    if not response:
-        raise ValueError(
-            f"Failed to get response from xeno-canto API for {xc_sci_name} ({ebird_6_code}): {call_type}. status code: {status_code}"
-        )
-    response_json = response.json()
-
-    return [rec["id"] for rec in response_json["recordings"]]
+    status_code = response.status_code if response is not None else None
+    raise ValueError(
+        f"Failed to get response from xeno-canto API for {xc_sci_name} ({ebird_6_code}): {call_type}. status code: {status_code}"
+    )
 
 
 def convert_ebird_6_code_to_xc_sci_name(ebird_6_code: str):
