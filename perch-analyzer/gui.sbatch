@@ -6,4 +6,4 @@
 #SBATCH --output=perch-gui-%j.log
 
 cd /home/mschulist/perch-agile-modeling/perch-analyzer
-uv run perch-analyzer gui --data_dir data --host 0.0.0.0
+uv run perch-analyzer gui --data_dir data --host 0.0.0.0 --port 8001
