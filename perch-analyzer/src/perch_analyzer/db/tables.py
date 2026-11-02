@@ -43,6 +43,19 @@ class ClassifierOutputWindow(Base):
     label: Mapped[str] = mapped_column(nullable=False, unique=False)
 
 
+class User(Base):
+    """A GUI login. Added after the other tables; `create_all` adds it to
+    existing databases, and older versions of this code simply ignore it."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(unique=True)
+    # `auth.hash_password` output: "scrypt$<salt hex>$<hash hex>".
+    password_hash: Mapped[str] = mapped_column()
+    created_at: Mapped[str] = mapped_column()
+
+
 class TargetRecording(Base):
     __tablename__ = "target_recordings"
 

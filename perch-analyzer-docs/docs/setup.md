@@ -28,4 +28,38 @@ perch-analyzer init \
     --embedding_model=perch_v2
 ```
 
-- `data_dir` is the directory used to [setup](setup) a project. 
+- `data_dir` is the directory used to [setup](setup) a project.
+- `user_name` is the name the command line tools record you as. In the GUI,
+  annotations are credited to whoever is signed in.
+
+## Logins
+
+The GUI asks everyone to sign in, so several people can annotate the same
+project at once and each person's labels are recorded under their own name.
+There are no roles: every account can do everything.
+
+Create an account for each annotator:
+
+```bash
+perch-analyzer add_user --data_dir=<data-directory> --username=<name>
+```
+
+You will be asked for the password twice. Pass `--password=<password>` to set it
+without a prompt, though it will then end up in your shell history.
+
+The other account commands are:
+
+- `perch-analyzer list_users --data_dir=<data-directory>` lists the accounts.
+- `perch-analyzer set_password --data_dir=<data-directory> --username=<name>`
+  resets a password. People can also change their own from the `Account` page
+  in the GUI.
+- `perch-analyzer remove_user --data_dir=<data-directory> --username=<name>`
+  deletes an account. Annotations it made are kept, and anyone signed in as
+  that user is sent back to the login page.
+
+If a project has no accounts yet, the GUI's login page offers to create the
+first one instead.
+
+To let others reach the GUI over your network, start it with `--host 0.0.0.0`
+(see [Annotate](annotate)). The passwords are stored as salted hashes, but the
+GUI is served over plain HTTP. Only expose it on a network you trust.

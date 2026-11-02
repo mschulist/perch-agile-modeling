@@ -18,6 +18,7 @@ from perch_analyzer.app_context import AppContext
 from perch_analyzer.config.config import Config
 from perch_analyzer.db.db import AnalyzerDB
 from perch_analyzer.examine import audio_windows
+from perch_analyzer.jobs import JobManager
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,11 @@ class ProjectServices:
     @cached_property
     def analyzer_db(self) -> AnalyzerDB:
         return self.ctx.analyzer_db
+
+    @cached_property
+    def jobs(self) -> JobManager:
+        """Background CLI jobs. One manager per GUI process."""
+        return JobManager(self.ctx.data_dir)
 
     @property
     def hoplite_db(self) -> SQLiteUSearchDB:

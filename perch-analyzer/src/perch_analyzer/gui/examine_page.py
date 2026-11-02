@@ -16,6 +16,7 @@ from perch_analyzer.gui.components import (
     wait_for_client,
 )
 from perch_analyzer.gui.services import ProjectServices, project
+from perch_analyzer.gui.session import require_user
 from perch_analyzer.gui.views import WindowView, build_views
 
 logger = logging.getLogger(__name__)
@@ -34,8 +35,9 @@ class ExamineView:
     running would delete that widget mid-event.
     """
 
-    def __init__(self, services: ProjectServices):
+    def __init__(self, services: ProjectServices, user: str):
         self.services = services
+        self.user = user
         self.all_labels: list[str] = []
         self.selected_label: str | None = None
         self.window_ids: list[int] = []
@@ -60,12 +62,12 @@ class ExamineView:
     def _load_page(self, window_ids: list[int]) -> list[WindowView]:
         return build_views(self.services, window_ids)
 
-    def _save(self, window_id: int, labels: list[str]) -> None:
+    def _save(self, window_id: int, labels: list[str], user: str) -> None:
         examine_annotations.update_labels(
-            config=self.services.config,
             hoplite_db=self.services.hoplite_db,
             window_id=window_id,
             new_labels=labels,
+            provenance=user,
         )
 
     # --- UI ------------------------------------------------------------
@@ -163,7 +165,7 @@ class ExamineView:
         await self._render_page()
 
     async def _on_save(self, window_id: int, labels: list[str]) -> None:
-        await run_blocking(self._save, window_id, labels)
+        await run_blocking(self._save, window_id, labels, self.user)
         ui.notify("Saved labels", type="positive")
         for label in labels:
             if label not in self.all_labels:
@@ -185,4 +187,4 @@ class ExamineView:
 
 
 async def examine_page() -> None:
-    await ExamineView(project()).build()
+    await ExamineView(project(), require_user()).build()

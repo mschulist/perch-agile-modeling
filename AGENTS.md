@@ -30,7 +30,7 @@ exist.
 
 ```bash
 cd perch-analyzer
-uv run pytest           # 26 tests; builds every GUI page headlessly
+uv run pytest           # builds every GUI page headlessly and runs real job subprocesses
 uvx ruff format src tests scripts
 uvx ruff check src tests
 uvx pyrefly check       # reads [tool.pyrefly] from pyproject.toml; must be 0 errors
@@ -47,17 +47,24 @@ you get the project's settings rather than the tools' defaults.
   and annotations. SQLite plus a usearch vector index, owned by perch-hoplite.
   Queried through `config_dict` filters; see `HopliteDBInterface`'s docstring
   for the filter grammar (`eq`, `isin`, `approx`, ...).
-- **analyzer** (`<data_dir>/analyzer.db`) — classifiers, classifier outputs and
-  target recordings. SQLAlchemy, ours, in `db/tables.py` and `db/db.py`.
+- **analyzer** (`<data_dir>/analyzer.db`) — classifiers, classifier outputs,
+  target recordings and GUI logins (`users`). SQLAlchemy, ours, in
+  `db/tables.py` and `db/db.py`. Keep schema changes additive: `create_all`
+  adds new tables to old databases but never alters existing ones.
 
 A project directory also holds `config.yaml`, `classifiers/`,
-`classifier_outputs/`, `target_recordings/` and `precomputed_windows/`.
+`classifier_outputs/`, `target_recordings/`, `precomputed_windows/`, and,
+once the GUI has run, `jobs/` (one `<id>.json` + `<id>.log` per job),
+`.gui_secret` (signs session cookies) and `.nicegui/` (session storage).
 
 ### Modules
 
 ```
-cli.py              argparse; a Command table, one handler per subcommand
+cli.py              argparse; a Command table, one handler per subcommand.
+                    Also the GUI bridge: gui_commands, command_arguments, to_argv
 app_context.py      AppContext: lazily opens config + both databases
+auth.py             salted scrypt password hashing (stdlib only)
+jobs.py             JobManager: runs gui=True commands as subprocesses
 logging_config.py   console + file logging
 config/             Config (pydantic/yaml), project initialization
 embed/              wraps perch_hoplite EmbedWorker
@@ -84,6 +91,11 @@ keep `perch-analyzer --help` under ~0.2s.
 **Commands import their own dependencies.** CLI handlers import their module
 lazily so `init` never pays for jax, polars or TensorFlow. `AppContext` opens
 the config and each database on first access.
+
+**Building the parser must not import NiceGUI.** `cli.gui_args` reads its
+defaults from `gui/settings.py` for this reason. Every GUI job builds the
+parser in a fresh process, and NiceGUI reads `NICEGUI_STORAGE_PATH` when it is
+first imported, which `handle_gui` sets. `tests/test_cli.py` guards this.
 
 **Leave the root logger alone.** `logging_config.setup_logging` pins root to
 WARNING on purpose: perch-hoplite logs every SQL statement it executes through
@@ -128,11 +140,43 @@ node toolchain — that is the point, so keep it that way.
   `--page_timeout` and `--reconnect_timeout`. NiceGUI's own 3s defaults are far
   too short once spectrograms are rendered on demand.
 
-### Long jobs stay on the CLI
+### Logins
 
-`embed`, `search`, `create_classifier` and `run_classifier` are CLI-only by
-design. The GUI is for annotating and reviewing. Don't add job launching to it
-without asking.
+- Every page except `/login` is wrapped by `gui/auth.guarded` in
+  `register_pages`. The wrapper returns a `RedirectResponse` to the login page
+  when nobody is signed in, or when the account has since been removed. A new
+  page needs no extra code, as long as it is listed in `gui/app.PAGES`.
+- The signed-in name lives in `app.storage.user`, reached through
+  `gui/session.current_user()`. That storage is bound to the request, so read
+  it on the event loop and pass the name into `load()`/`run_blocking()`
+  callbacks. Never read it inside a worker thread.
+- Labels written from the GUI are credited to that name
+  (`update_labels(..., provenance=user)`). `config.user_name` is only the CLI's
+  identity.
+- `/data/...` is a route (`gui/app.serve_data`), not static files. It requires
+  a login and serves only `precomputed_windows/` and `target_recordings/`. The
+  project directory also holds `config.yaml` (with the Xeno-canto API key) and
+  both databases.
+- There are no roles and no locking of windows between annotators, by design.
+
+### Jobs: which commands the GUI may start
+
+Commands with `gui=True` in `cli.COMMANDS` (`target_recordings`, `search`,
+`gather_classifier_outputs`) can be started from the GUI. `embed`,
+`create_classifier` and `run_classifier` stay CLI-only by design. Don't flip
+them without asking.
+
+- `JobManager` runs `python -m perch_analyzer <cmd>` as a subprocess, so heavy
+  imports and models never load into the GUI process. Status and output are
+  kept in files under `jobs/` (no DB table). A command can only have one run
+  at a time.
+- `gui/job_forms.JobForm` builds its fields from the command's argparse
+  actions, so a new flag shows up in the GUI automatically. Pass `fixed=` to
+  pre-set a field on a contextual page, and `options=` to offer choices.
+- A job that writes to hoplite must commit in small transactions. Python's
+  sqlite3 holds the write lock from the first INSERT until commit, and a
+  long-held lock makes GUI label saves fail with "database is locked". See
+  `search/search.py`.
 
 ## Testing
 
@@ -149,6 +193,12 @@ every GUI bug found so far has been in a handler, not in a first render.
 
 Commands that need the 779 MB perch_v2 download or the Xeno-canto API
 (`embed`, `search`, `target_recordings`) are not covered; verify those by hand.
+`tests/test_jobs.py` and the job tests in `test_gui_interactions.py` run
+`gather_classifier_outputs` for real, as subprocesses,
+against the fixture project, which includes a small classifier output parquet.
+
+The `gui` fixture signs in as `conftest.TEST_USERNAME`. Use
+`gui_unauthenticated` to test the login flow itself.
 
 ## Gotchas
 
@@ -158,7 +208,7 @@ Commands that need the 779 MB perch_v2 download or the Xeno-canto API
 - `db/tables.py` still carries `max_train_examples_per_label`. It is vestigial
   (hoplite dropped it) and kept only because existing databases declare the
   column `NOT NULL`.
-- `xenocanto.get_xc_ids` retries `while status_code != 200` and only breaks out
-  on 401, so a 404 or 500 loops forever. Known bug, not yet fixed.
+- `xenocanto.get_xc_ids` retries only on 429/5xx, at most `MAX_ATTEMPTS`
+  times. It used to loop forever on a 404, which would hang a GUI job.
 - Test data under `perch-analyzer/data/` is gitignored and holds a real
   Xeno-canto API key. Don't copy it into anything committed.

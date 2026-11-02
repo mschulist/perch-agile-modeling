@@ -2,6 +2,7 @@ from nicegui import ui
 
 from perch_analyzer.gui.components import DOCS_URL, LOGO_URL, page_layout
 from perch_analyzer.gui.services import project
+from perch_analyzer.gui.session import require_user
 
 
 def home_page() -> None:
@@ -17,7 +18,7 @@ def home_page() -> None:
 
         with ui.card().classes("gap-1"):
             ui.label(f"Project: {config.project_name}").classes("text-lg font-medium")
-            ui.label(f"User: {config.user_name}").classes("text-gray-600")
+            ui.label(f"Signed in as: {require_user()}").classes("text-gray-600")
             ui.label(f"Embedding model: {config.embedding_model}").classes(
                 "text-gray-600"
             )

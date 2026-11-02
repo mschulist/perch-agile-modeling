@@ -9,8 +9,6 @@ from perch_hoplite.db import datatypes
 from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 from pydantic import BaseModel, ConfigDict
 
-from perch_analyzer.config import config
-
 logger = logging.getLogger(__name__)
 
 # Offsets are floats written from the same source on both sides of the join,
@@ -105,11 +103,16 @@ def get_windows_by_label(
 
 
 def update_labels(
-    config: config.Config,
     hoplite_db: SQLiteUSearchDB,
     window_id: int,
     new_labels: Sequence[str],
+    provenance: str,
 ) -> None:
+    """Make `new_labels` the window's positive labels.
+
+    Labels that are added are credited to `provenance`, the GUI user making
+    the change.
+    """
     window = hoplite_db.get_window(window_id)
 
     existing_annotations = hoplite_db.get_all_annotations(
@@ -133,7 +136,7 @@ def update_labels(
                 offsets=window.offsets,
                 label=label,
                 label_type=datatypes.LabelType.POSITIVE,
-                provenance=config.user_name,
+                provenance=provenance,
             )
 
     hoplite_db.commit()

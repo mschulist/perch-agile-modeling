@@ -32,6 +32,10 @@ from .project_shape import (
 
 pytest_plugins = ["nicegui.testing.user_plugin"]
 
+# The account `project_dir` creates, which the `gui` fixture signs in as.
+TEST_USERNAME = "tester"
+TEST_PASSWORD = "correct horse"
+
 # 1x1 transparent PNG.
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
@@ -143,8 +147,42 @@ def project_dir(tmp_path: Path) -> Path:
     analyzer_db.insert_classifier_output_windows(
         output_id, [(1, 2.5, LABELS[0]), (2, 1.25, LABELS[0])]
     )
+    _write_classifier_output_parquet(
+        data_dir / "classifier_outputs" / f"{output_id}.parquet",
+        audio_file.name,
+    )
+
+    analyzer_db.create_user(TEST_USERNAME, TEST_PASSWORD)
 
     return data_dir
+
+
+def _write_classifier_output_parquet(path: Path, filename: str) -> None:
+    """A small output file, so gather_classifier_outputs has rows to sample."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from perch_analyzer.classify.classify import ARROW_SCHEMA
+
+    rows = [
+        # (window_id, label, logit)
+        (window_id, label, float(NUM_WINDOWS - window_id))
+        for window_id in range(1, NUM_WINDOWS + 1)
+        for label in LABELS
+    ]
+    pq.write_table(
+        pa.table(
+            {
+                "filename": [filename] * len(rows),
+                "logit": [logit for _, _, logit in rows],
+                "timestamp_s": [(wid - 1) * WINDOW_SIZE_S for wid, _, _ in rows],
+                "window_id": [wid for wid, _, _ in rows],
+                "label": [label for _, label, _ in rows],
+            },
+            schema=ARROW_SCHEMA,
+        ),
+        path,
+    )
 
 
 @pytest.fixture
@@ -153,14 +191,26 @@ def ctx(project_dir: Path) -> AppContext:
 
 
 @pytest.fixture
-async def gui(user: User, ctx: AppContext) -> User:
-    """Register the GUI pages against the test project for the simulated user."""
-    from nicegui import app as nicegui_app
-
+async def gui_unauthenticated(user: User, ctx: AppContext) -> User:
+    """Register the GUI pages against the test project, signed out."""
     from perch_analyzer.gui.app import register_pages
     from perch_analyzer.gui.services import ProjectServices, set_project
 
     set_project(ProjectServices(ctx))
     register_pages()
-    nicegui_app.add_static_files("/data", ctx.data_dir)
     return user
+
+
+async def sign_in(user: User, username: str, password: str) -> None:
+    await user.open("/login")
+    user.find(marker="username").type(username)
+    user.find(marker="password").type(password)
+    user.find(marker="submit").click()
+
+
+@pytest.fixture
+async def gui(gui_unauthenticated: User) -> User:
+    """The GUI pages, signed in as the test user."""
+    await sign_in(gui_unauthenticated, TEST_USERNAME, TEST_PASSWORD)
+    await gui_unauthenticated.should_see("Welcome to Perch Analyzer!")
+    return gui_unauthenticated

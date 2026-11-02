@@ -8,7 +8,8 @@ After annotating a sufficient number of windows, you can create a custom classif
 
 ## Creating a classifier
 
-To create a custom classifier, run the following command: 
+Training and running classifiers are only available from the command line. To
+create a custom classifier, run the following command: 
 
 ```bash
 perch-analyzer create_classifier \
@@ -50,7 +51,9 @@ In the `Classifiers` window, you can click on the classifier to see all of the a
 
 ![](/classifier_runs.png)
 
-Then, you can click on a classifier output to review the actual windows and corresponding logits. To get samples from a classifer output, use the following command:
+Then, you can click on a classifier output to review the actual windows and corresponding logits. To get samples from a classifier output, expand **Gather more windows** on that page, pick a label and a logit range, and press **Gather windows**. The label list updates when the job is done.
+
+From the command line, use the following command:
 
 ```bash
 perch-analyzer gather_classifier_outputs \

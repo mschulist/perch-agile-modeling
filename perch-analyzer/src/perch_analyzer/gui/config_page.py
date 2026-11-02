@@ -12,7 +12,9 @@ def config_page() -> None:
         with ui.card().classes("w-full"), ui.grid(columns=2).classes("w-full gap-4"):
             _read_only("Data Path", config.data_path)
             project_name = _text_input("Project Name", config.project_name)
-            user_name = _text_input("User Name", config.user_name)
+            # GUI labels are credited to whoever is signed in; this name is
+            # only used by command line tools.
+            user_name = _text_input("Default User (CLI)", config.user_name)
             _read_only("Embedding Model", config.embedding_model)
             api_key = _text_input("Xenocanto API Key", config.xenocanto_api_key)
 
